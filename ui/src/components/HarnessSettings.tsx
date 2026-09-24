@@ -538,6 +538,42 @@ export function HarnessSettings({ id, embedded = false, onNavigate }: {
             </div>
           </section>
 
+          {draft?.base === 'sol-pi' && (
+            <section className="form-section">
+              <div><h3>SoL-Pi mechanisms</h3><p>Configure this agent independently of Pi. Changes apply to the next Task turn.</p></div>
+              <div className="field-stack">
+                {([
+                  ['actionFusion', 'Action Fusion', 'Combine an edit or write with its follow-up shell command.'],
+                  ['observationPack', 'ObservationPack', 'Replace repeated large outputs with handles and exact paged recall.'],
+                  ['evidencePreservingReducer', 'Evidence-Preserving Reducer', 'Extract verified evidence from diagnostic logs using an additional model call.'],
+                  ['onlineContextCompact', 'Online Context Compact', 'Consider context compaction when a plan step completes.'],
+                ] as const).map(([key, label, description]) => (
+                  <div className="capability-row" key={key}>
+                    <span className="capability-icon" aria-hidden="true"><iconify-icon icon="tabler:adjustments"></iconify-icon></span>
+                    <div className="capability-copy"><strong id={`sol-${key}`}>{label}</strong><span>{description}</span></div>
+                    <button className="toggle-button" type="button" disabled={readOnly}
+                      aria-labelledby={`sol-${key}`} aria-pressed={draft.solPi?.[key] ?? true}
+                      onClick={() => upd({ solPi: { ...draft.solPi, [key]: !(draft.solPi?.[key] ?? true) } })}>
+                      {(draft.solPi?.[key] ?? true) ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                ))}
+                <div className="two-column-fields">
+                  <div className="field"><label htmlFor="solRatio">Cache write/read price ratio</label>
+                    <input id="solRatio" type="number" min={0} step="any" disabled={readOnly}
+                      value={draft.solPi?.cacheWriteReadRatio ?? 12.5}
+                      onChange={(e) => upd({ solPi: { ...draft.solPi, cacheWriteReadRatio: e.target.value === '' ? undefined : Number(e.target.value) } })} />
+                    <span className="field-help">Used by the compaction cost gate. Set this for the model and provider you run.</span></div>
+                  <div className="field"><label htmlFor="solReducer">Reducer model (optional)</label>
+                    <input id="solReducer" disabled={readOnly} value={draft.solPi?.reducerModel ?? ''}
+                      placeholder="Use the Task model"
+                      onChange={(e) => upd({ solPi: { ...draft.solPi, reducerModel: e.target.value.trim() || undefined } })} />
+                    <span className="field-help">Uses the same provider connection and API format. Empty uses the Task model. Reducer usage is recorded separately and is not included in the current cost widgets.</span></div>
+                </div>
+              </div>
+            </section>
+          )}
+
           <section className="form-section">
             <div><h3>Runtime limits</h3><p>Stop Tasks that run longer or take more agent steps than expected.</p></div>
             <div className="field-stack">

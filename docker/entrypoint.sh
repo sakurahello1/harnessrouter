@@ -179,7 +179,7 @@ export HOSTNAME=0.0.0.0
 TOOLS="$DATA_DIR/agent-tools"
 export PATH="$TOOLS/bin:$PATH"
 export NODE_PATH="$TOOLS/lib/node_modules"
-export HR_BACKENDS="${HR_BACKENDS:-claude,codex,hermes,pi,dsh,opencode,qwen,gemini,cline,omp,goose,kimi,aider,openhands,systemone}"
+export HR_BACKENDS="${HR_BACKENDS:-claude,codex,hermes,pi,sol-pi,dsh,opencode,qwen,gemini,cline,omp,goose,kimi,aider,openhands,systemone}"
 
 wanted()   { [[ ",$HR_BACKENDS," == *",$1,"* ]]; }
 # The executable IS the definition of "installed" — an installer that exits 0 without producing
@@ -191,6 +191,7 @@ backend_bin() {
     codex)  echo "$TOOLS/bin/codex" ;;
     hermes) echo "$TOOLS/venv/bin/hermes" ;;
     pi)     echo "$TOOLS/bin/pi" ;;
+    sol-pi) echo "$TOOLS/sol-pi-runtime/bin/pi" ;;
     dsh)    echo "$TOOLS/dsh-venv/bin/dsh-ready" ;;
     opencode) echo "$TOOLS/bin/opencode" ;;
     qwen)   echo "$TOOLS/bin/qwen" ;;
@@ -608,6 +609,19 @@ install_backends() {
         @earendil-works/pi-coding-agent pi-mcp-adapter || true
   fi
 
+  # SoL-Pi has its own pinned Pi runtime; installing it never upgrades ordinary Pi.
+  SOL_PI_REV=1559b5cb12c72da4a485bc50fe326586b216fb19
+  SOL_TOOLS="$TOOLS/sol-pi-runtime"
+  if wanted sol-pi && { [ ! -x "$SOL_TOOLS/bin/pi" ] || [ "$(cat "$SOL_TOOLS/revision" 2>/dev/null)" != "$SOL_PI_REV" ]; }; then
+    echo "[harnessrouter] installing independent SoL-Pi runtime (MIT)…"
+    if try_install "SoL-Pi" npm install -g --prefix "$SOL_TOOLS" --no-audit --no-fund --ignore-scripts \
+        @earendil-works/pi-coding-agent@0.85.1 @earendil-works/pi-agent-core@0.85.1 \
+        @earendil-works/pi-ai@0.85.1 @earendil-works/pi-tui@0.85.1 typebox@1.3.7 \
+        "git+https://github.com/NVlabs/SoL-Pi.git#$SOL_PI_REV" pi-mcp-adapter; then
+      printf '%s' "$SOL_PI_REV" > "$SOL_TOOLS/revision"
+    fi
+  fi
+
   if wanted omp && [ ! -x "$(backend_bin omp)" ]; then
     echo "[harnessrouter] installing Oh My Pi (MIT)…"
     try_install "Oh My Pi" install_omp || true
@@ -778,6 +792,10 @@ cleanup() { trap - TERM INT; for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null |
 trap cleanup TERM INT EXIT
 
 avail=""; missing=""
+export HR_SOL_PI_BIN="$TOOLS/sol-pi-runtime/bin/pi"
+export HR_SOL_PI_ENTRY="$TOOLS/sol-pi-runtime/lib/node_modules/sol-pi/src/sol-pi/index.ts"
+export HR_SOL_PI_MCP_EXT="$TOOLS/sol-pi-runtime/lib/node_modules/pi-mcp-adapter"
+
 # Derived from HR_BACKENDS, not a second hardcoded list. The literal list here missed opencode and
 # reported "backends available: none" on an instance that had it installed and working.
 for b in ${HR_BACKENDS//,/ }; do
