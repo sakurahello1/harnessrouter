@@ -118,6 +118,7 @@ try {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: `matrix custom ${base}`, base,
+          ...(process.env.MODEL ? { default_model: process.env.MODEL } : {}),
           system_prompt: 'You follow your skills exactly.',
           skills: [SKILL('matrix-stamp')],
           // SoL-Pi inherits Pi's actual tool ids; a nonexistent WebSearch proves nothing.

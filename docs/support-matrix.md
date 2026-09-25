@@ -3421,3 +3421,11 @@ Not run in this column, 198 pairs the provider serves that the harness did not r
 - qwen x qwen3.8-max: not run, not run in this column
 - qwen x step-3.7-flash: not run, not run in this column
 
+## Provider: banban
+
+| Harness | Model | First | Follow-up | Switch | Artifact | Recycle | Served by | Notes |
+|---|---|---|---|---|---|---|---|---|
+| sol-pi | deepseek-v4.1-flash | pass | pass | n/a | pass | pass | sol-pi-banban-acceptance |  |
+
+1 pairs, 4 of 4 scenario runs passed.
+

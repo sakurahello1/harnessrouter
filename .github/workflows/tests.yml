@@ -90,6 +90,10 @@ jobs:
       - run: pip install -r runner/requirements.txt
       - run: python scripts/sol-pi/check-lock.py
       - run: bash docker/sol-pi/install.sh "$RUNNER_TEMP/sol-pi"
+      - name: Runtime is executable but not writable by an isolated user
+        run: |
+          sudo -u nobody env PATH="$PATH" "$RUNNER_TEMP/sol-pi/bin/pi" --version
+          sudo -u nobody test ! -w "$RUNNER_TEMP/sol-pi"
       - name: Real CLI against a local scripted provider (no API spend)
         run: |
           export HR_SOL_PI_BIN="$RUNNER_TEMP/sol-pi/bin/pi"

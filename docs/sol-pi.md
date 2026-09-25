@@ -15,7 +15,9 @@ Both are MIT licensed. The normal Pi installation is not upgraded or replaced.
 MCP adapter 2.37.0. Registry artifacts carry SHA-512 integrity; the upstream Git
 commit is fixed and its 23 extension source files are checked against
 `docker/sol-pi/source.sha256`. Installation is staged and validated before replacement;
-the previous installation is retained if replacement fails. No unverified fallback
+the previous installation is retained if replacement fails. Published packages are
+readable/executable by isolated session users and not writable by those users.
+The installer also repairs permissions when reusing a verified runtime. No unverified fallback
 or floating dependency is used by this installer. The CI runtime job runs the same
 installer and CLI smoke test without a provider key.
 
@@ -123,27 +125,50 @@ Playwright CLI browser session, then run `playwright-cli run-code --filename
 scripts/sol-pi/ui-smoke.js` in that session. It uses browser-local API fixtures and
 checks defaults, toggling, a zero cache ratio, reducer model, serialization and reload.
 
-### Local validation record (2026-09-25; release acceptance still pending)
+### Local validation record (2026-09-25)
 
-- Combined Gateway/Runner regression: 1,133 passed, 19 skipped after the
-  credential exclusions, resume probe and error-path checks. Run from a Linux path without
-  spaces; an existing MCP bridge assertion assumes an unquoted path.
-- The earlier UI build and desktop settings smoke passed. The revised UI exposes
-  read-only built-in mechanism defaults and corrects the AGENTS.md label; its
-  build and narrow-width audit must be rerun after the validation host recovers.
-  The host's WSL disk exhausted its underlying F: drive during the revised build.
-- Official CLI smoke: all-on, all-off and reducer/fallback scenarios passed,
-  including the locked installer layout and the checkpoint restore extension.
-  The final lockfile additionally fills integrity entries omitted by upstream's
-  nested dependency metadata; reinstall against that final lockfile is pending.
+- Combined Gateway/Runner regression on current upstream main: 1,195 passed, 19 skipped. Run from a Linux
+  path without spaces; an existing MCP bridge assertion assumes an unquoted path.
+- Revised UI: type-check and production build passed. Jest contains no tests and
+  was run with `--passWithNoTests`; this is not evidence of UI test coverage.
+  The browser settings smoke passed default values, toggling, zero ratio, reducer
+  model, save/reload, and read-only built-in defaults without custom-setting leakage.
+- Final integrity lock reinstalled successfully. Official CLI smoke passed all-on,
+  all-off, reducer/fallback, checkpoint restore, and model switch/back against a
+  scripted endpoint. These are not live model-quality measurements.
+- Dedicated Banban connection, DeepSeek V4.1 Flash: first turn, follow-up, artifact
+  cards versus stored files, and forced recycle/history recall passed (4/4).
+  Live model switch is n/a because only one model was authorized.
+- Custom harness: stored skill and tool policy, hidden script token, produced
+  `stamp.txt`, disabled `edit` unused, and a recorded DeepWiki MCP call all passed.
+- Local plus final-container runs: 12 successful real turns used 39,636
+  uncached input, 1,252 output and 44,160 cached input tokens.
+  Assuming the user's rates are CNY per million, estimated cost is CNY 0.0068;
+  this is not a provider invoice.
 - Entrypoint shell syntax and Git whitespace checks passed.
 
-This is a local integration branch, not a deployment. Docker is unavailable on
-the validation host, so the complete image has not been built. Paid-provider runs,
-forced online compaction, observation archive/recall behavior and the full support
-matrix's recycle/file-card assertions remain deployment acceptance work. The
-custom-harness suite includes SoL-Pi and disables its actual `edit` tool with Action
-Fusion off, rather than testing a nonexistent WebSearch capability. The authorized
-live acceptance target is DeepSeek V4.1 Flash on a dedicated connection with an
-approximately CNY 5 budget. No live provider calls have been made by this validation
-yet; no benchmark quality or speed claim is made.
+Raw and reviewed matrix results and usage are in
+[verification/sol-pi-2026-09-25](verification/sol-pi-2026-09-25/README.md).
+The matrix column certifies only this connection/model on this local instance.
+The broader catalog inherits Pi's transport coverage, not a measured compatibility
+claim for every model. Forced online compaction and long-context archive/recall
+quality have not been measured against a paid provider.
+
+The core container built and passed first-start installation, login, runtime version,
+non-owner execution/non-writability, health check, and the same real routing/custom
+harness suites. Build flags: `WITH_DOC_PREVIEW=0`, `WITH_MEDIA=0`,
+`WITH_STARTER_KITS=0`, `WITH_BUILTIN_SKILLS=0` (browser defaults to 0).
+The default all-feature image was not certified: enabling bundled OfficeCLI while
+turning off document preview exposed a missing ICU dependency in that existing
+optional-feature combination. No claim is made about office/media starter bundles.
+
+The container run found and fixed a real SoL-Pi installer bug: `mktemp` left the
+published runtime root at 0700, preventing a session uid from executing Pi.
+Fresh installation and repair of a reused 0700 runtime now pass with uid 20000;
+CI also checks execution/non-writability as a different user. Windows builds also
+needed recursive dependency exclusions and LF enforcement for Docker shell scripts.
+
+Responsive audit covered built-in and custom settings at 15 widths (390–1440 px).
+Only the existing sidebar +4 px finding appeared, reproduced on ordinary Pi; no
+new settings-content or page overflow was found. This is not a zero-finding audit.
+This remains a local integration branch, not a published deployment.

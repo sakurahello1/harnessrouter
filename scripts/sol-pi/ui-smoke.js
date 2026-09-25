@@ -1,6 +1,7 @@
 // Run with playwright-cli run-code --filename scripts/sol-pi/ui-smoke.js after
 // signing into a local UI build. API fixtures are local to this browser session.
 async (page) => {
+  const base = new URL(page.url()).origin;
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   let agent = { id: 'sol-pi-ui-test', name: 'SoL-Pi experiment', base: 'sol-pi', baseLabel: 'SoL-Pi',
     defaultModel: 'gpt-5.4', systemPrompt: '', skills: [], mcpServers: [], plugins: [], disabledTools: [], solPi: {} };
@@ -20,7 +21,7 @@ async (page) => {
     else if (path.endsWith('/traces')) body = { sessions: [], cursor: '' };
     await route.fulfill({ json: body });
   });
-  await page.goto('http://127.0.0.1:3187/harnesses?h=sol-pi-ui-test&view=settings');
+  await page.goto(`${base}/harnesses?h=sol-pi-ui-test&view=settings`);
   const fusion = page.getByRole('button', { name: 'Action Fusion', exact: true });
   await fusion.waitFor();
   if (await fusion.getAttribute('aria-pressed') !== 'true') throw new Error('Default switch not enabled');
@@ -32,12 +33,12 @@ async (page) => {
   if (saved?.base !== 'sol-pi' || saved?.sol_pi?.actionFusion !== false || saved?.sol_pi?.cacheWriteReadRatio !== 0 || saved?.sol_pi?.reducerModel !== 'small-model') {
     throw new Error('SoL-Pi config did not survive form serialization');
   }
-  await page.goto('http://127.0.0.1:3187/harnesses?h=sol-pi-ui-test&view=settings');
+  await page.goto(`${base}/harnesses?h=sol-pi-ui-test&view=settings`);
   await fusion.waitFor();
   if (await fusion.getAttribute('aria-pressed') !== 'false') throw new Error('Saved switch did not reload');
   await page.getByRole('heading', { name: 'SoL-Pi mechanisms' }).scrollIntoViewIfNeeded();
   console.log('SoL-Pi UI: independent base, defaults, toggle, zero ratio, reducer model, save and reload passed.');
-  await page.goto('http://127.0.0.1:3187/harnesses?h=sol-pi&view=settings');
+  await page.goto(`${base}/harnesses?h=sol-pi&view=settings`);
   await page.getByRole('heading', { name: 'SoL-Pi mechanisms' }).waitFor();
   if (!(await fusion.isDisabled())) throw new Error('Built-in mechanisms must be read-only');
   if (await fusion.getAttribute('aria-pressed') !== 'true') throw new Error('Custom toggle leaked into built-in defaults');
