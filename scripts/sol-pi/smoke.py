@@ -7,14 +7,15 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "runner"))
-from server import Auth, _build_pi, _sol_pi_to_claude, _sol_pi_eof
-from sol_pi import FEATURES, build
+from server import Auth, CHECKPOINT_EXCLUDE, _build_pi, _sol_pi_to_claude, _sol_pi_eof
+from sol_pi import FEATURES, build, session_present
 
 requests = []
 mode = "full"
@@ -95,7 +96,18 @@ def main():
                     assert any(e.get("type") == "sol_pi_event" and e.get("kind") == "fallback" for e in events)
                     assert "ERROR_MARKER" in json.dumps(requests[-1]["messages"]), "Fallback lost source evidence"
                 sid = next(e["id"] for e in events if e.get("type") == "session")
-                for model in ("test-model", "other-model"):
+                assert session_present(temp, sid), "Session lookup disagrees with the pinned CLI"
+                # A fresh CLI process after deleting/restoring the workspace must recover history.
+                with tempfile.TemporaryDirectory(prefix="hr-solpi-checkpoint-") as backup:
+                    archive = str(Path(backup) / "workspace.tgz")
+                    subprocess.run(["tar", "-czf", archive, *[f"--exclude={p}" for p in CHECKPOINT_EXCLUDE],
+                                    "-C", temp, "."], check=True)
+                    shutil.rmtree(root)
+                    root.mkdir()
+                    subprocess.run(["tar", "-xzf", archive, "-C", temp], check=True)
+                assert session_present(temp, sid)
+                assert not (root / ".harness/home/.sol-pi/agent/models.json").exists()
+                for model in ("test-model", "other-model", "test-model"):
                     before = len(requests)
                     cmd = build(_build_pi, "openai-api", auth, model, "Continue our conversation.", temp, env,
                                 config=config, resume_session_id=sid)
@@ -106,7 +118,8 @@ def main():
                     assert "SMOKE_OK" in json.dumps(requests[before]["messages"]), "History was lost"
                     assert requests[before]["model"] == model
                 reports.append({"configuration": mode, "tools": sorted(tools), "artifact": mode != "reducer", "reducer_fallback_and_usage": mode == "reducer",
-                                "fusion": mode == "full", "resume_and_model_switch": True})
+                                "fusion": mode == "full", "resume_and_model_switch": True,
+                                "checkpoint_restore": True})
     finally:
         service.shutdown()
     print(json.dumps({"passed": reports}, indent=2))

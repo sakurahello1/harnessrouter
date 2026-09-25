@@ -11,6 +11,13 @@ branch's default). On startup the installer places it in
 `$TOOLS/sol-pi-runtime`, separately from ordinary Pi. The runtime uses Pi 0.85.1 and
 [NVlabs/SoL-Pi commit 1559b5c](https://github.com/NVlabs/SoL-Pi/tree/1559b5cb12c72da4a485bc50fe326586b216fb19).
 Both are MIT licensed. The normal Pi installation is not upgraded or replaced.
+`docker/sol-pi/package-lock.json` locks the complete npm dependency graph, including
+MCP adapter 2.37.0. Registry artifacts carry SHA-512 integrity; the upstream Git
+commit is fixed and its 23 extension source files are checked against
+`docker/sol-pi/source.sha256`. Installation is staged and validated before replacement;
+the previous installation is retained if replacement fails. No unverified fallback
+or floating dependency is used by this installer. The CI runtime job runs the same
+installer and CLI smoke test without a provider key.
 
 For a separately managed runner, install the same dependencies and set:
 
@@ -24,8 +31,9 @@ An unavailable runtime fails with 503; the runner never substitutes ordinary Pi.
 
 ## Create and configure
 
-Choose **SoL-Pi** when creating an agent, then use **SoL-Pi mechanisms** in its
-settings. Each switch is independent. All four default to enabled on this base;
+Choose **SoL-Pi** to inspect the built-in defaults. Use **Fork and Customize** to
+create an editable agent, then use **SoL-Pi mechanisms** in its settings.
+Each switch is independent. All four default to enabled on this base;
 explicit `false` disables a mechanism. Ordinary Pi has no SoL-Pi settings.
 
 The custom harness API accepts this implementation-specific extension:
@@ -77,7 +85,11 @@ SoL-Pi sessions and skills live under `.harness/home/.sol-pi/agent`. Pi retains
 effective configuration through upstream's public registration API, so `.pi/sol-pi.json`
 inside a task cannot override agent switches. Effective settings are saved in
 `.harness/sol-pi/effective-config.json`. These paths are inside the normal session
-checkpoint and excluded from user-produced file cards.
+checkpoint and excluded from user-produced file cards. `auth.json`, `models.json`
+and `mcp.json` under the SoL-Pi agent directory are excluded from snapshots; they
+can carry provider keys or MCP credentials. The runner rebuilds connection settings
+on the next turn. Session headers are checked before resume so missing history is
+reported through the existing `resume_lost` event.
 
 SoL-Pi emits its terminal result only when the process settles, including turns
 automatically continued after compaction. Reducer decisions and tagged model usage
@@ -92,6 +104,7 @@ upstream behavior. Benchmark cost comparisons require auditing both before use.
 ```sh
 python -m pytest runner/tests/test_sol_pi.py runner/tests/test_pi_normalize.py -q
 python -m pytest gateway/tests/test_sol_pi_backend.py -q
+python scripts/sol-pi/check-lock.py
 python scripts/sol-pi/smoke.py
 ```
 
@@ -99,7 +112,9 @@ The smoke test uses a local scripted provider and the installed, unmodified Pi a
 SoL-Pi packages. It verifies tool schemas with switches on/off, actual fused file
 write and shell execution, output artifacts, conversation resume and model switch.
 It also triggers the real reducer, verifies safe fallback on invalid evidence,
-and checks that auxiliary-model usage is recorded once.
+and checks that auxiliary-model usage is recorded once. It deletes and restores
+the workspace through a credential-excluding archive and verifies that the next
+CLI process retains history, including switching back to the original model.
 It does not measure task quality or replace live-provider support-matrix checks.
 Use `scripts/support-matrix` for provider/model-specific acceptance before deployment.
 
@@ -108,19 +123,27 @@ Playwright CLI browser session, then run `playwright-cli run-code --filename
 scripts/sol-pi/ui-smoke.js` in that session. It uses browser-local API fixtures and
 checks defaults, toggling, a zero cache ratio, reducer model, serialization and reload.
 
-### Local integration acceptance (2026-09-25)
+### Local validation record (2026-09-25; release acceptance still pending)
 
-- Gateway regression suite: 613 passed, 17 skipped.
-- Runner regression suite: 518 passed, 2 skipped. Run from a Linux path without
+- Combined Gateway/Runner regression: 1,133 passed, 19 skipped after the
+  credential exclusions, resume probe and error-path checks. Run from a Linux path without
   spaces; an existing MCP bridge assertion assumes an unquoted path.
-- UI: dependency installation, TypeScript check and production build passed.
-  This checkout has no Jest test cases; the settings interaction smoke passed,
-  and the rendered desktop settings were visually checked.
+- The earlier UI build and desktop settings smoke passed. The revised UI exposes
+  read-only built-in mechanism defaults and corrects the AGENTS.md label; its
+  build and narrow-width audit must be rerun after the validation host recovers.
+  The host's WSL disk exhausted its underlying F: drive during the revised build.
 - Official CLI smoke: all-on, all-off and reducer/fallback scenarios passed,
-  including the exact isolated global installation layout used by the installer.
+  including the locked installer layout and the checkpoint restore extension.
+  The final lockfile additionally fills integrity entries omitted by upstream's
+  nested dependency metadata; reinstall against that final lockfile is pending.
 - Entrypoint shell syntax and Git whitespace checks passed.
 
 This is a local integration branch, not a deployment. Docker is unavailable on
 the validation host, so the complete image has not been built. Paid-provider runs,
-forced online compaction, observation archive/recall behavior and checkpoint recycle
-remain deployment acceptance work. No benchmark quality or speed claim is made.
+forced online compaction, observation archive/recall behavior and the full support
+matrix's recycle/file-card assertions remain deployment acceptance work. The
+custom-harness suite includes SoL-Pi and disables its actual `edit` tool with Action
+Fusion off, rather than testing a nonexistent WebSearch capability. The authorized
+live acceptance target is DeepSeek V4.1 Flash on a dedicated connection with an
+approximately CNY 5 budget. No live provider calls have been made by this validation
+yet; no benchmark quality or speed claim is made.

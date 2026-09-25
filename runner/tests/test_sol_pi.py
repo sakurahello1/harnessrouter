@@ -10,6 +10,56 @@ from server import Auth, BACKENDS, _build_pi, _sol_pi_to_claude, _sol_pi_eof
 from sol_pi import FEATURES, build, normalize_config
 
 
+def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, monkeypatch):
+    import io
+    import tarfile
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(server, "WORKSPACE_ROOT", str(tmp_path / "workspaces"))
+    monkeypatch.setattr(server, "SPOOL_DIR", str(tmp_path))
+    monkeypatch.setattr(server, "_WS_MARKER_DIR", str(tmp_path / "markers"))
+    monkeypatch.setattr(server, "_SESSION_UIDS", False)
+    monkeypatch.setattr(server, "_SANDBOX_PER_SESSION", False)
+    monkeypatch.setattr(server, "_INTERNAL_KEY", "")
+    root = pathlib.Path(server._ws("solpi-test"))
+    agent = root / ".harness/home/.sol-pi/agent"
+    slug = "--" + str(root).lstrip("/").replace("/", "-") + "--"
+    history = agent / "sessions" / slug / "history.jsonl"
+    history.parent.mkdir(parents=True)
+    history.write_text(json.dumps({"type": "session", "id": "known-session", "cwd": str(root)}) + "\n")
+    for name in ("auth.json", "models.json", "mcp.json"):
+        (agent / name).write_text('{"key": "SECRET_SENTINEL"}')
+    assert server._resume_lost("sol-pi", [], "known-session", str(root)) is None
+    assert server._resume_lost("sol-pi", [], "unknown-session", str(root)) == "unknown-session"
+    with TestClient(server.app) as client:
+        response = client.get("/checkpoint?identifier=solpi-test")
+        assert response.status_code == 200, response.text
+        with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
+            names = archive.getnames()
+            assert any(n.endswith("history.jsonl") for n in names)
+            for member in archive.getmembers():
+                if member.isfile():
+                    assert b"SECRET_SENTINEL" not in archive.extractfile(member).read(), member.name
+        assert client.delete("/workspace?identifier=solpi-test").status_code == 200
+        assert server._resume_lost("sol-pi", [], "known-session", str(root)) == "known-session"
+        assert client.post("/hydrate?identifier=solpi-test", content=response.content).status_code == 200
+    assert server._resume_lost("sol-pi", [], "known-session", str(root)) is None
+    assert not (agent / "models.json").exists()
+
+
+def test_provider_failure_and_model_substitution_are_not_success():
+    for message, expected in [
+        ({"model": "main", "stopReason": "error", "errorMessage": "401 invalid key"}, "401 invalid key"),
+        ({"model": "substituted", "content": [{"type": "text", "text": "hello"}]}, "instead of"),
+    ]:
+        state = {"model": "main"}
+        _sol_pi_to_claude({"type": "sol_pi_ready", "config": {}, "revision": "test"}, state)
+        _sol_pi_to_claude({"type": "message_end", "message": {"role": "assistant", **message}}, state)
+        _sol_pi_to_claude({"type": "agent_end"}, state)
+        result, = _sol_pi_eof(state, 0)
+        assert result["is_error"] and expected in result["result"]
+
+
 @pytest.fixture
 def installed(tmp_path, monkeypatch):
     binary = tmp_path / "pi"

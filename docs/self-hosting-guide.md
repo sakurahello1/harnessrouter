@@ -1023,3 +1023,8 @@ Apache-2.0, see [LICENSE](../LICENSE). Third-party notices are in [NOTICE](../NO
 
 The agent CLIs are **not** redistributed here; they are installed on first run under their own
 licenses. Review them before enabling a backend.
+
+
+SoL-Pi (MIT) is installed independently of Pi with a locked dependency graph and
+source checksums. See [the SoL-Pi guide](sol-pi.md) for its four mechanism switches,
+installation details and current acceptance status.

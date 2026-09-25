@@ -37,4 +37,9 @@ async (page) => {
   if (await fusion.getAttribute('aria-pressed') !== 'false') throw new Error('Saved switch did not reload');
   await page.getByRole('heading', { name: 'SoL-Pi mechanisms' }).scrollIntoViewIfNeeded();
   console.log('SoL-Pi UI: independent base, defaults, toggle, zero ratio, reducer model, save and reload passed.');
+  await page.goto('http://127.0.0.1:3187/harnesses?h=sol-pi&view=settings');
+  await page.getByRole('heading', { name: 'SoL-Pi mechanisms' }).waitFor();
+  if (!(await fusion.isDisabled())) throw new Error('Built-in mechanisms must be read-only');
+  if (await fusion.getAttribute('aria-pressed') !== 'true') throw new Error('Custom toggle leaked into built-in defaults');
+  await page.getByRole('button', { name: 'Fork and Customize' }).waitFor();
 }

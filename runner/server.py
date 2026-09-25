@@ -72,6 +72,7 @@ import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from sol_pi import session_present as _sol_pi_session_present
 
 app = FastAPI(title="harness-runner")
 
@@ -300,6 +301,7 @@ def _openhands_session_present(cwd: str, cmd: list[str], session_id: str) -> boo
 
 
 _SESSION_PRESENT = {
+    "sol-pi": lambda cwd, cmd, sid: _sol_pi_session_present(cwd, sid),
     "claude": _argv_session_present,
     "opencode": _argv_session_present,
     "goose": _goose_session_present,
@@ -470,6 +472,9 @@ CHECKPOINT_EXCLUDE = ["./tmp", "./.gcp-sa.json", "./.codex", "./.credentials.jso
                       # key for custom providers — neither may travel in a checkpoint tarball.
                       "./.harness/home/.pi/agent/auth.json",
                       "./.harness/home/.pi/agent/models.json",
+                      "./.harness/home/.sol-pi/agent/auth.json",
+                      "./.harness/home/.sol-pi/agent/models.json",
+                      "./.harness/home/.sol-pi/agent/mcp.json",
                       # omp models / auth
                       "./.harness/home/.omp/agent/auth.json",
                       "./.harness/home/.omp/agent/models.json",
@@ -616,6 +621,8 @@ def _git_ensure(ws: str) -> None:
         "tmp/", ".gcp-sa.json", ".codex/", ".credentials.json", ".harness/**/.credentials.json",
         ".harness/home/.hermes/.env", ".harness/home/.hermes/auth.json",
         ".harness/home/.pi/agent/auth.json", ".harness/home/.pi/agent/models.json",
+        ".harness/home/.sol-pi/agent/auth.json", ".harness/home/.sol-pi/agent/models.json",
+        ".harness/home/.sol-pi/agent/mcp.json",
         ".harness/goose/config/secrets.yaml",
         "# harness: the CLI home is checkpointed by tar, not by this repo (see _git_ensure)",
         ".harness/home/",

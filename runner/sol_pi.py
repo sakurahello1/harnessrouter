@@ -2,12 +2,30 @@
 import json
 import math
 import os
+import re
 from pathlib import Path
 
 from fastapi import HTTPException
 
 REVISION = "1559b5cb12c72da4a485bc50fe326586b216fb19"
 FEATURES = ("actionFusion", "observationPack", "evidencePreservingReducer", "onlineContextCompact")
+
+
+def session_present(cwd: str, session_id: str) -> bool:
+    """Pi 0.85.1 reads the session header id and cwd, not a filename substring."""
+    resolved = os.path.abspath(cwd)
+    slug = "--" + re.sub(r"[/\\:]", "-", re.sub(r"^[/\\]", "", resolved)) + "--"
+    sessions = Path(cwd) / ".harness/home/.sol-pi/agent/sessions" / slug
+    for path in sessions.glob("*.jsonl"):
+        try:
+            with path.open(encoding="utf-8") as stream:
+                header = json.loads(stream.readline())
+            if (header.get("type") == "session" and header.get("id") == session_id
+                    and header.get("cwd") == resolved):
+                return True
+        except (OSError, ValueError, AttributeError):
+            continue
+    return False
 
 
 def normalize_config(value=None):

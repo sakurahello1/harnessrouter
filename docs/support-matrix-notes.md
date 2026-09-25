@@ -1355,3 +1355,24 @@ wrote `trace.json` with `config_version: 1` and 61 archived frames; a probe with
 script ran on `script/s1` and finished. The calibration itself (baseline, one change, validation)
 runs on a Calibrator on the claude base with the calibrate package.
 
+
+## sol-pi — integration candidate, not a measured provider column
+
+SoL-Pi is a separate backend with Pi 0.85.1 and NVlabs/SoL-Pi commit
+1559b5cb12c72da4a485bc50fe326586b216fb19. The four upstream mechanisms are individually
+configurable. Pi transport/normalization are reused; SoL-Pi waits for process EOF
+because native compaction may continue after an agent_end event.
+
+Local checks on 2026-09-25: 1,133 Gateway/Runner tests passed, 19 skipped. A real
+installed CLI against a scripted local endpoint passed all-on/all-off and reducer
+fallback scenarios, conversation restore and model switch/back. These are integration
+checks, NOT a live provider column. The candidate model catalog follows Pi's transport
+coverage; compatibility on this instance has not been measured and is not certified.
+
+Release gates remain: complete image build/self-host flow; the five live scenarios
+(connection and served-model checks, rendered artifact cards, forced recycle);
+skill/script/tool-policy/MCP custom harness; responsive audit of the revised settings.
+DeepSeek V4.1 Flash was authorized for a roughly CNY 5 acceptance run. The run has not
+started: WSL's backing F: drive filled and the environment stopped before any paid calls.
+No API key is recorded here. See [SoL-Pi integration](sol-pi.md) for configuration and
+accounting limits. Do not count this entry as a passing row in the support matrix.

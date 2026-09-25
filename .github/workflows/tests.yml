@@ -75,6 +75,27 @@ jobs:
       - run: pip install -e protocol/conformance pytest build "setuptools>=68" wheel
       - run: python -m pytest protocol/conformance/tests -q
 
+  sol-pi-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docker/sol-pi/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r runner/requirements.txt
+      - run: python scripts/sol-pi/check-lock.py
+      - run: bash docker/sol-pi/install.sh "$RUNNER_TEMP/sol-pi"
+      - name: Real CLI against a local scripted provider (no API spend)
+        run: |
+          export HR_SOL_PI_BIN="$RUNNER_TEMP/sol-pi/bin/pi"
+          export HR_SOL_PI_ENTRY="$RUNNER_TEMP/sol-pi/lib/node_modules/sol-pi/src/sol-pi/index.ts"
+          python scripts/sol-pi/smoke.py
+
   console:
     runs-on: ubuntu-latest
     defaults:
