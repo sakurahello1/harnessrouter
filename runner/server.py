@@ -2593,7 +2593,8 @@ def _pi_lab_to_claude(obj: dict, state: dict) -> list[dict]:
         state["_pi_lab_ready"] = {"config": obj.get("config"), "revision": obj.get("revision")}
         return [{**obj, "type": "system", "subtype": "pi_lab_ready"}]
     if obj.get("type") == "agent_end":
-        return []
+        # A retry's agent_end still has to drop the failed attempt's error and text (see _pi_to_claude).
+        return _pi_to_claude(obj, state) if obj.get("willRetry") else []
     if obj.get("type") == "pi_lab_event":
         if obj.get("kind") == "provider_response":
             route = f"{obj.get('provider', '')}/{obj.get('model', '')}"

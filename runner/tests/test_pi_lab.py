@@ -152,3 +152,15 @@ def test_compaction_continuation_has_one_terminal_event_and_aux_usage():
 def test_premature_exit_is_not_success():
     result, = _pi_lab_eof({"model": "main"}, 0)
     assert result["is_error"]
+
+
+def test_a_retried_attempt_does_not_fail_the_turn():
+    """pi's own retry after a cut reply stream (verbatim capture, see test_pi_normalize): Pi Lab
+    waits for EOF, and the attempt's error must not outlive the retry that succeeded."""
+    events = [json.loads(line) for line in
+              (pathlib.Path(__file__).parent / "fixtures" / "pi_retry_after_stream_cut.jsonl").read_text().splitlines()]
+    state = {"model": "test-model", "final": ""}
+    for event in [{"type": "pi_lab_ready", "config": {}, "revision": "test"}, *events]:
+        _pi_lab_to_claude(event, state)
+    result, = _pi_lab_eof(state, 0)
+    assert not result["is_error"] and result["result"] == "The file is saved as Report.pdf"
