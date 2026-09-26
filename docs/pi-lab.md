@@ -20,12 +20,10 @@ Both are MIT licensed. The normal Pi installation is not upgraded or replaced.
 `docker/pi-lab/package-lock.json` locks the complete npm dependency graph, including
 MCP adapter 2.37.0. Registry artifacts carry SHA-512 integrity; the upstream SoL-Pi
 commit is fixed and its 23 extension source files are checked against
-`docker/pi-lab/source.sha256`. Installation is staged and validated before replacement;
-the previous installation is retained if replacement fails. Published packages are
-readable/executable by isolated session users and not writable by those users.
-The installer also repairs permissions when reusing a verified runtime. No unverified fallback
-or floating dependency is used by this installer. The CI runtime job runs the same
-installer and CLI smoke test without a provider key.
+`docker/pi-lab/source.sha256`. The runtime is installed into a staging directory and
+moved into place once it has passed that check; a later start with the same lockfile
+and checksums reuses it. Isolated session users can read and run it, not write it.
+The CI runtime job runs the same installer and CLI smoke test without a provider key.
 
 For a separately managed runner, install the same dependencies and set:
 
@@ -35,7 +33,7 @@ export HR_PI_LAB_SOL_PI_ENTRY=/opt/pi-lab/lib/node_modules/sol-pi/src/sol-pi/ind
 export HR_PI_LAB_MCP_EXT=/opt/pi-lab/lib/node_modules/pi-mcp-adapter
 ```
 
-An unavailable runtime fails with 503; the runner never substitutes ordinary Pi.
+The runner starts Pi Lab's own pinned `pi`, never the ordinary one on `PATH`.
 
 ## Create and configure
 
@@ -96,9 +94,8 @@ are saved in `.harness/pi-lab/effective-config.json`. These paths are inside the
 normal session checkpoint and excluded from user-produced file cards. `auth.json`,
 `models.json` and `mcp.json` under the Pi Lab agent directory are excluded from
 snapshots; they can carry provider keys or MCP credentials. The runner rebuilds
-connection settings on the next turn. Session headers are checked before resume so
-missing history is reported through the existing `resume_lost` event. MCP tools are
-registered directly on the agent, as for plain Pi.
+connection settings on the next turn. Resume works as for plain Pi (`--session-id`),
+and MCP tools are registered directly on the agent, as for plain Pi.
 
 Pi Lab emits its terminal result only when the process settles, including turns
 automatically continued after compaction. Reducer decisions and tagged model usage
@@ -140,12 +137,12 @@ Run the Python suites from a path without spaces: an existing MCP bridge asserti
 Offline, on upstream `main` at `384bd75` with this branch applied, after the rename
 (2026-09-26):
 
-- Gateway and runner: 1,202 passed, 19 skipped.
+- Gateway and runner: 1,198 passed, 19 skipped.
 - Console: type-check and production build passed. Jest contains no tests; the
   settings panel's browser smoke passed on 2026-09-25 under the old id and was not
   re-run after the rename.
 - `check-lock.py` verified 427 locked packages and the upstream commit. A fresh
-  `install.sh` verified all 23 SoL-Pi source hashes; `smoke.py` passed all-on,
+  `install.sh` verified all 23 SoL-Pi source hashes, and a second run reused it; `smoke.py` passed all-on,
   all-off and reducer configurations (fusion, artifacts, reducer fallback and
   auxiliary usage, resume and model switch/back, checkpoint restore) against a
   scripted endpoint. These are not live model-quality measurements.
@@ -182,8 +179,8 @@ optional-feature combination. No claim is made about office/media starter bundle
 
 The container run found and fixed a real installer bug: `mktemp` left the
 published runtime root at 0700, preventing a session uid from executing Pi.
-Fresh installation and repair of a reused 0700 runtime now pass with uid 20000;
-CI also checks execution/non-writability as a different user. Windows builds also
+A fresh installation now passes with uid 20000; CI also checks
+execution/non-writability as a different user. Windows builds also
 needed recursive dependency exclusions and LF enforcement for Docker shell scripts.
 
 Responsive audit covered built-in and custom settings at 15 widths (390–1440 px).

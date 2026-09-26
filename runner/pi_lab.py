@@ -1,8 +1,6 @@
 """Independent Pi Lab backend; only the Pi transport is shared with ordinary Pi."""
 import json
-import math
 import os
-import re
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -11,48 +9,15 @@ REVISION = "1559b5cb12c72da4a485bc50fe326586b216fb19"
 FEATURES = ("actionFusion", "observationPack", "evidencePreservingReducer", "onlineContextCompact")
 
 
-def session_present(cwd: str, session_id: str) -> bool:
-    """Pi 0.85.1 reads the session header id and cwd, not a filename substring."""
-    resolved = os.path.abspath(cwd)
-    slug = "--" + re.sub(r"[/\\:]", "-", re.sub(r"^[/\\]", "", resolved)) + "--"
-    sessions = Path(cwd) / ".harness/home/.pi-lab/agent/sessions" / slug
-    for path in sessions.glob("*.jsonl"):
-        try:
-            with path.open(encoding="utf-8") as stream:
-                header = json.loads(stream.readline())
-            if (header.get("type") == "session" and header.get("id") == session_id
-                    and header.get("cwd") == resolved):
-                return True
-        except (OSError, ValueError, AttributeError):
-            continue
-    return False
-
-
-def normalize_config(value=None):
-    value = {} if value is None else value
-    if not isinstance(value, dict):
-        raise HTTPException(400, "pi_lab must be an object")
-    allowed = {*FEATURES, "cacheWriteReadRatio", "reducerModel"}
-    if set(value) - allowed:
-        raise HTTPException(400, "Unknown pi_lab fields: " + ", ".join(sorted(set(value) - allowed)))
-    config = {key: value.get(key, True) for key in FEATURES}
-    if any(type(v) is not bool for v in config.values()):
-        raise HTTPException(400, "Pi Lab mechanism switches must be boolean")
-    ratio = value.get("cacheWriteReadRatio", 12.5)
-    if type(ratio) not in (float, int) or not math.isfinite(ratio) or ratio < 0:
-        raise HTTPException(400, "cacheWriteReadRatio must be finite and non-negative")
-    config["cacheWriteReadRatio"] = ratio
-    if "reducerModel" in value:
-        model = value["reducerModel"]
-        if not isinstance(model, str) or not model.strip():
-            raise HTTPException(400, "reducerModel must be a non-empty model id")
-        config["reducerModel"] = model.strip()
-    return config
+def with_defaults(config=None):
+    """The harness's switches over the defaults: all four on, SoL-Pi's cache ratio. The gateway
+    validated them when the harness was saved; a built-in harness sends none."""
+    return {**{key: True for key in FEATURES}, "cacheWriteReadRatio": 12.5, **(config or {})}
 
 
 def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
           resume_session_id=None, mcp_servers=None, tools_disabled=None, vision=True):
-    config = normalize_config(config)
+    config = with_defaults(config)
     disabled = {x.split(" (")[0].strip() for x in tools_disabled or []}
     if config["actionFusion"] and disabled.intersection({"bash", "edit", "write"}):
         raise HTTPException(400, "Disable Action Fusion before disabling bash, edit, or write")
@@ -60,19 +25,14 @@ def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
         raise HTTPException(400, "ObservationPack requires obs_recall")
     if config["onlineContextCompact"] and "update_plan" in disabled:
         raise HTTPException(400, "Online Context Compact requires update_plan")
-    binary = os.environ.get("HR_PI_LAB_BIN", "")
-    entry = Path(os.environ.get("HR_PI_LAB_SOL_PI_ENTRY", ""))
-    if not binary or not Path(binary).is_file() or not entry.is_file():
-        raise HTTPException(503, "Pi Lab is not installed; configure HR_PI_LAB_BIN and HR_PI_LAB_SOL_PI_ENTRY")
+    entry = Path(os.environ["HR_PI_LAB_SOL_PI_ENTRY"])
     agent_dir = Path(env.get("HOME") or cwd) / ".pi-lab" / "agent"
-    mcp_extension = os.environ.get("HR_PI_LAB_MCP_EXT", "")
-    if mcp_servers and not (mcp_extension and Path(mcp_extension).exists()):
-        raise HTTPException(503, "Pi Lab MCP adapter is not installed; configure HR_PI_LAB_MCP_EXT")
     cmd = build_pi(provider, auth, model, prompt, cwd, env,
                    resume_session_id=resume_session_id, mcp_servers=mcp_servers,
                    tools_disabled=tools_disabled, vision=vision, agent_dir=agent_dir,
-                   mcp_extension=mcp_extension)
-    cmd[0] = binary
+                   mcp_extension=os.environ.get("HR_PI_LAB_MCP_EXT", ""))
+    # Pi Lab's own pinned pi, never the ordinary one on PATH.
+    cmd[0] = os.environ["HR_PI_LAB_BIN"]
     route = cmd[cmd.index("--provider") + 1]
     reducer_model = config.pop("reducerModel", model)
     effective = {"version": 1, **config, "evidencePreservingReducerProvider": route,

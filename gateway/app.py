@@ -7228,7 +7228,7 @@ async def _resp_execute(translator: _RespTranslator, *, org: str, member: str, s
                                  if backend == "gemini" and model_req else None),
                 "prompt": runner_prompt, "max_turns": max_step,
                 "timeout_seconds": timeout_s,
-                "pi_lab": _pi_lab_config(json.loads((hv or {}).get("pi_lab") or "null")) if backend == "pi-lab" else None,
+                "pi_lab": json.loads((hv or {}).get("pi_lab") or "null"),
                 "auth": sandbox_auth, "resume_session_id": resume, "files": files_in,
                 "mcp_servers": mcp_servers, "skills": skills, "plugins": plugin_pkgs, "agent_doc": agent_doc,
                 "skills_suppressed": skills_suppressed, "tools_disabled": turn_tools_off,
@@ -7350,8 +7350,8 @@ async def _resp_execute(translator: _RespTranslator, *, org: str, member: str, s
             if new and n_total > fed_upto:
                 skip = fed_upto - cursor if fed_upto > cursor else 0
                 for cev in new[skip:]:
-                    if backend == "pi-lab" and cev.get("type") == "result" and cev.get("pi_lab"):
-                        rec["pi_lab"] = {"config": body["pi_lab"], **cev["pi_lab"]}
+                    if cev.get("type") == "result" and "pi_lab" in cev:
+                        rec["pi_lab"] = cev["pi_lab"]
                     for oev in translator.feed(cev):
                         await emit(oev)
                 fed_upto = n_total
@@ -14843,10 +14843,10 @@ def _either(snake: str):
 _PI_LAB_FEATURES = ("actionFusion", "observationPack", "evidencePreservingReducer", "onlineContextCompact")
 
 
-def _pi_lab_config(value=None):
-    value = {} if value is None else value
-    if not isinstance(value, dict):
-        raise HTTPException(400, "pi_lab must be an object")
+def _pi_lab_config(value):
+    """A Pi Lab harness's switches, checked once, when the harness is saved; what is stored is what
+    the runner gets. Unset switches are on, as on the built-in."""
+    value = value or {}
     allowed = {*_PI_LAB_FEATURES, "cacheWriteReadRatio", "reducerModel"}
     if set(value) - allowed:
         raise HTTPException(400, "Unknown pi_lab fields: " + ", ".join(sorted(set(value) - allowed)))
@@ -14863,7 +14863,6 @@ def _pi_lab_config(value=None):
             raise HTTPException(400, "reducerModel must be a non-empty model id")
         config["reducerModel"] = model.strip()
     return config
-
 
 
 class HarnessBody(BaseModel):
@@ -14919,7 +14918,7 @@ def _harness_out(v: dict) -> dict:
             "env": _parse_env(v.get("env")),
             "maxStep": int(v.get("max_step")) if str(v.get("max_step") or "").isdigit() else None,
             "timeoutSeconds": int(v.get("timeout_seconds")) if str(v.get("timeout_seconds") or "").isdigit() else None,
-            "piLab": _pi_lab_config(json.loads(v.get("pi_lab") or "null")) if v.get("base") == "pi-lab" else None,
+            "piLab": json.loads(v.get("pi_lab") or "null"),
             "calibrates": str(v.get("calibrates") or ""),
             "member": v.get("member") or "", "workspace": v.get("workspace") or "", "createdAt": created}
 
@@ -14930,10 +14929,7 @@ async def _vg_list_by_org(label: str, org: str) -> list[dict]:
 
 def _harness_props(body: HarnessBody) -> dict:
     base = _require_supported_base(body.base)   # refuse at create, not at the first task
-    if body.pi_lab is not None and base != "pi-lab":
-        raise HTTPException(400, "pi_lab configuration requires the pi-lab base")
-    pi_lab = _pi_lab_config(body.pi_lab) if base == "pi-lab" else None
-    return {"pi_lab": json.dumps(pi_lab), "name": body.name, "base": base, "base_label": body.base_label or base,
+    return {"pi_lab": json.dumps(_pi_lab_config(body.pi_lab) if base == "pi-lab" else None), "name": body.name, "base": base, "base_label": body.base_label or base,
             "default_model": body.default_model or "", "system_prompt": body.system_prompt or "",
             "mcp_servers": json.dumps(body.mcp_servers or []), "skills": json.dumps(body.skills or []),
             "plugins": json.dumps(body.plugins or []),

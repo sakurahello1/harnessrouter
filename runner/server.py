@@ -72,7 +72,6 @@ import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from pi_lab import session_present as _pi_lab_session_present
 
 app = FastAPI(title="harness-runner")
 
@@ -301,7 +300,6 @@ def _openhands_session_present(cwd: str, cmd: list[str], session_id: str) -> boo
 
 
 _SESSION_PRESENT = {
-    "pi-lab": lambda cwd, cmd, sid: _pi_lab_session_present(cwd, sid),
     "claude": _argv_session_present,
     "opencode": _argv_session_present,
     "goose": _goose_session_present,
@@ -2585,16 +2583,13 @@ def _pi_lab_to_claude(obj: dict, state: dict) -> list[dict]:
         state["_pi_lab_ready"] = {"config": obj.get("config"), "revision": obj.get("revision")}
         return [{**obj, "type": "system", "subtype": "pi_lab_ready"}]
     if obj.get("type") == "agent_end":
-        state["_pi_lab_agent_end"] = True
         return []
     if obj.get("type") == "pi_lab_event":
         if obj.get("kind") == "provider_response":
             route = f"{obj.get('provider', '')}/{obj.get('model', '')}"
             totals = state.setdefault("_pi_lab_aux", {}).setdefault(route, {})
-            for key in ("input", "output", "cacheRead", "cacheWrite"):
-                value = (obj.get("usage") or {}).get(key, 0)
-                if isinstance(value, (int, float)) and value >= 0:
-                    totals[key] = totals.get(key, 0) + value
+            for key, value in obj["usage"].items():
+                totals[key] = totals.get(key, 0) + value
         return [{**obj, "type": "system", "subtype": "pi_lab_reducer"}]
     return _pi_to_claude(obj, state)
 
@@ -2604,14 +2599,11 @@ def _pi_lab_eof(state: dict, rc: int) -> list[dict]:
         state["_pi_error"] = "Pi Lab's SoL-Pi extension did not initialize; check the pinned runtime and extension installation"
     if rc and not state.get("_pi_error"):
         state["_pi_error"] = f"Pi Lab exited with code {rc}"
-    if not state.get("_pi_lab_agent_end") and not state.get("_pi_error"):
-        state["_pi_error"] = "Pi Lab ended without an agent_end event"
     events = _pi_to_claude({"type": "agent_end"}, state)
     for event in events:
         # Auxiliary models have their own rates. Preserve their usage separately rather
         # than charge their tokens at the main model's rate or call main-only cost total.
-        event["pi_lab"] = {**state.get("_pi_lab_ready", {}), "auxiliary_usage": state.get("_pi_lab_aux", {}),
-                           "main_usage_excludes_auxiliary": True}
+        event["pi_lab"] = {**state.get("_pi_lab_ready", {}), "auxiliary_usage": state.get("_pi_lab_aux", {})}
     return events
 
 
@@ -7299,7 +7291,6 @@ def capabilities(identifier: str = "") -> dict:
 
 
 class TurnReq(BaseModel):
-    pi_lab: dict | None = None            # independent pi-lab backend only
     backend: str = "claude"          # claude | codex | hermes | pi | dsh
     provider: str | None = None      # see BACKENDS[...].providers
     model: str | None = None
@@ -7353,8 +7344,6 @@ def turn(req: TurnReq, identifier: str = "") -> dict:
     spec = BACKENDS.get(backend)
     if not spec:
         raise HTTPException(400, f"unknown backend '{backend}' (one of {sorted(BACKENDS)})")
-    if req.pi_lab is not None and backend != "pi-lab":
-        raise HTTPException(400, "pi_lab configuration requires the pi-lab backend")
     cwd = req.cwd or _ws(identifier)
     if _SESSION_UIDS and req.cwd and os.path.realpath(req.cwd) != os.path.realpath(_ws(identifier)):
         # Behind the wall the directory decides which uid a turn runs as; a caller-chosen one

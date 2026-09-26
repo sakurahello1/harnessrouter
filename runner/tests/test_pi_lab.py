@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from server import Auth, BACKENDS, _build_pi, _pi_lab_to_claude, _pi_lab_eof
-from pi_lab import FEATURES, build, normalize_config
+from pi_lab import FEATURES, build
 
 
 def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, monkeypatch):
@@ -29,8 +29,6 @@ def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, mon
     history.write_text(json.dumps({"type": "session", "id": "known-session", "cwd": str(root)}) + "\n")
     for name in ("auth.json", "models.json", "mcp.json"):
         (agent / name).write_text('{"key": "SECRET_SENTINEL"}')
-    assert server._resume_lost("pi-lab", [], "known-session", str(root)) is None
-    assert server._resume_lost("pi-lab", [], "unknown-session", str(root)) == "unknown-session"
     with TestClient(server.app) as client:
         response = client.get("/checkpoint?identifier=pilab-test")
         assert response.status_code == 200, response.text
@@ -41,9 +39,9 @@ def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, mon
                 if member.isfile():
                     assert b"SECRET_SENTINEL" not in archive.extractfile(member).read(), member.name
         assert client.delete("/workspace?identifier=pilab-test").status_code == 200
-        assert server._resume_lost("pi-lab", [], "known-session", str(root)) == "known-session"
+        assert not history.exists()
         assert client.post("/hydrate?identifier=pilab-test", content=response.content).status_code == 200
-    assert server._resume_lost("pi-lab", [], "known-session", str(root)) is None
+    assert history.exists()
     assert not (agent / "models.json").exists()
 
 
@@ -62,12 +60,8 @@ def test_provider_failure_and_model_substitution_are_not_success():
 
 @pytest.fixture
 def installed(tmp_path, monkeypatch):
-    binary = tmp_path / "pi"
-    entry = tmp_path / "upstream.ts"
-    binary.touch()
-    entry.write_text("export const createSolPiExtension = () => {};", encoding="utf-8")
-    monkeypatch.setenv("HR_PI_LAB_BIN", str(binary))
-    monkeypatch.setenv("HR_PI_LAB_SOL_PI_ENTRY", str(entry))
+    monkeypatch.setenv("HR_PI_LAB_BIN", str(tmp_path / "pi"))
+    monkeypatch.setenv("HR_PI_LAB_SOL_PI_ENTRY", str(tmp_path / "upstream.ts"))
     return tmp_path, {"HOME": str(tmp_path / ".harness/home")}
 
 
@@ -112,20 +106,6 @@ def test_switches_cannot_bypass_tool_policy(installed, tool):
     with pytest.raises(HTTPException) as exc:
         launch(installed, tools_disabled=[tool])
     assert exc.value.status_code == 400
-
-
-def test_missing_runtime_does_not_fall_back_to_pi(monkeypatch, tmp_path):
-    monkeypatch.delenv("HR_PI_LAB_BIN", raising=False)
-    with pytest.raises(HTTPException) as exc:
-        launch((tmp_path, {"HOME": str(tmp_path)}))
-    assert exc.value.status_code == 503
-
-
-@pytest.mark.parametrize("cfg", [{"actionFusion": "false"}, {"x": True}, {"cacheWriteReadRatio": -1},
-                                     {"cacheWriteReadRatio": float("inf")}, {"reducerModel": ""}])
-def test_invalid_config_rejected(cfg):
-    with pytest.raises(HTTPException):
-        normalize_config(cfg)
 
 
 def test_original_pi_loads_no_pi_lab(installed):

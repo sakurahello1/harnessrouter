@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "runner"))
 from server import Auth, CHECKPOINT_EXCLUDE, _build_pi, _pi_lab_to_claude, _pi_lab_eof
-from pi_lab import FEATURES, build, session_present
+from pi_lab import FEATURES, build
 
 requests = []
 mode = "full"
@@ -96,7 +96,6 @@ def main():
                     assert any(e.get("type") == "pi_lab_event" and e.get("kind") == "fallback" for e in events)
                     assert "ERROR_MARKER" in json.dumps(requests[-1]["messages"]), "Fallback lost source evidence"
                 sid = next(e["id"] for e in events if e.get("type") == "session")
-                assert session_present(temp, sid), "Session lookup disagrees with the pinned CLI"
                 # A fresh CLI process after deleting/restoring the workspace must recover history.
                 with tempfile.TemporaryDirectory(prefix="hr-pilab-checkpoint-") as backup:
                     archive = str(Path(backup) / "workspace.tgz")
@@ -105,7 +104,6 @@ def main():
                     shutil.rmtree(root)
                     root.mkdir()
                     subprocess.run(["tar", "-xzf", archive, "-C", temp], check=True)
-                assert session_present(temp, sid)
                 assert not (root / ".harness/home/.pi-lab/agent/models.json").exists()
                 for model in ("test-model", "other-model", "test-model"):
                     before = len(requests)

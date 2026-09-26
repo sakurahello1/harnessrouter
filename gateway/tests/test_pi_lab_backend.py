@@ -28,7 +28,8 @@ def test_config_api_round_trip_and_ordinary_pi_separation():
         assert r.status_code == 200, r.text
         assert r.json()["piLab"]["actionFusion"] is True
         r = api.post("/v1/harnesses", headers=HEADERS, json={**body, "base": "pi"})
-        assert r.status_code == 400
+        assert r.status_code == 200, r.text
+        assert r.json()["piLab"] is None
 
 
 def test_distinct_backend_has_pi_connectivity_without_aliasing():
@@ -39,7 +40,8 @@ def test_distinct_backend_has_pi_connectivity_without_aliasing():
     assert gw._MODEL_CATALOG["pi-lab"]["models"] == gw._MODEL_CATALOG["pi"]["models"]
 
 
-@pytest.mark.parametrize("value", [{"actionFusion": "true"}, {"other": 1}, {"cacheWriteReadRatio": -1}])
+@pytest.mark.parametrize("value", [{"actionFusion": "true"}, {"other": 1}, {"cacheWriteReadRatio": -1},
+                                   {"cacheWriteReadRatio": float("inf")}, {"reducerModel": " "}])
 def test_invalid_config_rejected_before_storage(value):
     with pytest.raises(gw.HTTPException):
         gw._harness_props(gw.HarnessBody(name="x", base="pi-lab", pi_lab=value))
