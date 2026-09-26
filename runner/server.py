@@ -7308,6 +7308,7 @@ class TurnReq(BaseModel):
     agent_doc: str | None = None           # harness instruction doc → AGENTS.md (codex) / CLAUDE.md (claude)
     skills_suppressed: list[str] | None = None  # built-in skill names to NOT mount (harness disabled them)
     tools_disabled: list[str] | None = None     # built-in tool names to disable (claude: --disallowedTools)
+    pi_lab: dict | None = None                  # a Pi Lab harness's mechanism switches, as saved
     image_auth: dict | None = None         # {base_url, api_key, model} for image generation via the broker
     env: dict | None = None                # variables for the turn process: the harness's own (resolved by the
                                            # gateway, see _caller_env) and the platform's HR_ names (a harness

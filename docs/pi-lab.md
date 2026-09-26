@@ -137,7 +137,7 @@ Run the Python suites from a path without spaces: an existing MCP bridge asserti
 Offline, on upstream `main` at `384bd75` with this branch applied, after the rename
 (2026-09-26):
 
-- Gateway and runner: 1,198 passed, 19 skipped.
+- Gateway and runner: 1,199 passed, 19 skipped.
 - Console: type-check and production build passed. Jest contains no tests; the
   settings panel's browser smoke passed on 2026-09-25 under the old id and was not
   re-run after the rename.

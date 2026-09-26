@@ -45,6 +45,25 @@ def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, mon
     assert not (agent / "models.json").exists()
 
 
+def test_turn_hands_the_harness_switches_to_pi_lab(tmp_path, monkeypatch):
+    import pi_lab
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(server, "_SESSION_UIDS", False)
+    monkeypatch.setattr(server, "_INTERNAL_KEY", "")
+    seen = {}
+
+    def build(*args, config=None, **kw):
+        seen["config"] = config
+        raise HTTPException(418, "stop before spawning")
+    monkeypatch.setattr(pi_lab, "build", build)
+    with TestClient(server.app) as client:
+        r = client.post("/turn", json={"backend": "pi-lab", "prompt": "hi", "cwd": str(tmp_path),
+                                       "pi_lab": {"actionFusion": False}})
+    assert r.status_code == 418, r.text
+    assert seen["config"] == {"actionFusion": False}
+
+
 def test_provider_failure_and_model_substitution_are_not_success():
     for message, expected in [
         ({"model": "main", "stopReason": "error", "errorMessage": "401 invalid key"}, "401 invalid key"),
