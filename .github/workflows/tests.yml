@@ -75,7 +75,7 @@ jobs:
       - run: pip install -e protocol/conformance pytest build "setuptools>=68" wheel
       - run: python -m pytest protocol/conformance/tests -q
 
-  sol-pi-runtime:
+  pi-lab-runtime:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,22 +83,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: docker/sol-pi/package-lock.json
+          cache-dependency-path: docker/pi-lab/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r runner/requirements.txt
-      - run: python scripts/sol-pi/check-lock.py
-      - run: bash docker/sol-pi/install.sh "$RUNNER_TEMP/sol-pi"
+      - run: python scripts/pi-lab/check-lock.py
+      - run: bash docker/pi-lab/install.sh "$RUNNER_TEMP/pi-lab"
       - name: Runtime is executable but not writable by an isolated user
         run: |
-          sudo -u nobody env PATH="$PATH" "$RUNNER_TEMP/sol-pi/bin/pi" --version
-          sudo -u nobody test ! -w "$RUNNER_TEMP/sol-pi"
+          sudo -u nobody env PATH="$PATH" "$RUNNER_TEMP/pi-lab/bin/pi" --version
+          sudo -u nobody test ! -w "$RUNNER_TEMP/pi-lab"
       - name: Real CLI against a local scripted provider (no API spend)
         run: |
-          export HR_SOL_PI_BIN="$RUNNER_TEMP/sol-pi/bin/pi"
-          export HR_SOL_PI_ENTRY="$RUNNER_TEMP/sol-pi/lib/node_modules/sol-pi/src/sol-pi/index.ts"
-          python scripts/sol-pi/smoke.py
+          export HR_PI_LAB_BIN="$RUNNER_TEMP/pi-lab/bin/pi"
+          export HR_PI_LAB_SOL_PI_ENTRY="$RUNNER_TEMP/pi-lab/lib/node_modules/sol-pi/src/sol-pi/index.ts"
+          python scripts/pi-lab/smoke.py
 
   console:
     runs-on: ubuntu-latest

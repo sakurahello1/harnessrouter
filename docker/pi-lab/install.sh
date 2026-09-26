@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Immutable Git commit for SoL-Pi; npm lockfile integrity for registry tarballs,
+# Pi Lab runtime: immutable Git commit for SoL-Pi; npm lockfile integrity for registry tarballs,
 # including the MCP adapter and transitive packages. No floating runtime deps.
 set -euo pipefail
 target="${1:?usage: install.sh ABSOLUTE_RUNTIME_DIRECTORY}"
-case "$target" in /*) ;; *) echo 'SoL-Pi runtime path must be absolute'; exit 1 ;; esac
+case "$target" in /*) ;; *) echo 'Pi Lab runtime path must be absolute'; exit 1 ;; esac
 manifest_dir="$(cd "$(dirname "$0")" && pwd)"
 digest="$(cat "$manifest_dir/package-lock.json" "$manifest_dir/source.sha256" | sha256sum | cut -d ' ' -f1)"
 if [ -x "$target/bin/pi" ] && [ "$(cat "$target/lock.sha256" 2>/dev/null)" = "$digest" ] \
@@ -12,7 +12,7 @@ if [ -x "$target/bin/pi" ] && [ "$(cat "$target/lock.sha256" 2>/dev/null)" = "$d
   # Session processes use a different uid from the installer. The runtime contains
   # packages only; credentials live in each session's separate agent directory.
   chmod -R a+rX "$target"
-  echo 'SoL-Pi already installed and source verified'
+  echo 'Pi Lab already installed and source verified'
   exit 0
 fi
 mkdir -p "$(dirname "$target")"
@@ -40,4 +40,4 @@ if [ -e "$target" ]; then
 else
   mv -- "$stage" "$target"
 fi
-echo "SoL-Pi installed: Pi 0.85.1, lockfile SHA256 $digest"
+echo "Pi Lab installed: Pi 0.85.1 with SoL-Pi, lockfile SHA256 $digest"

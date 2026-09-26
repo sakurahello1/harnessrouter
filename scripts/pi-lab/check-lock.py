@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
-lock = json.loads((root / "docker/sol-pi/package-lock.json").read_text(encoding="utf-8"))
+lock = json.loads((root / "docker/pi-lab/package-lock.json").read_text(encoding="utf-8"))
 revision = "1559b5cb12c72da4a485bc50fe326586b216fb19"
 for name, package in lock["packages"].items():
     if not name:

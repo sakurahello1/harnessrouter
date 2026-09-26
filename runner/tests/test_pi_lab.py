@@ -6,8 +6,8 @@ import pytest
 from fastapi import HTTPException
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from server import Auth, BACKENDS, _build_pi, _sol_pi_to_claude, _sol_pi_eof
-from sol_pi import FEATURES, build, normalize_config
+from server import Auth, BACKENDS, _build_pi, _pi_lab_to_claude, _pi_lab_eof
+from pi_lab import FEATURES, build, normalize_config
 
 
 def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, monkeypatch):
@@ -21,18 +21,18 @@ def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, mon
     monkeypatch.setattr(server, "_SESSION_UIDS", False)
     monkeypatch.setattr(server, "_SANDBOX_PER_SESSION", False)
     monkeypatch.setattr(server, "_INTERNAL_KEY", "")
-    root = pathlib.Path(server._ws("solpi-test"))
-    agent = root / ".harness/home/.sol-pi/agent"
+    root = pathlib.Path(server._ws("pilab-test"))
+    agent = root / ".harness/home/.pi-lab/agent"
     slug = "--" + str(root).lstrip("/").replace("/", "-") + "--"
     history = agent / "sessions" / slug / "history.jsonl"
     history.parent.mkdir(parents=True)
     history.write_text(json.dumps({"type": "session", "id": "known-session", "cwd": str(root)}) + "\n")
     for name in ("auth.json", "models.json", "mcp.json"):
         (agent / name).write_text('{"key": "SECRET_SENTINEL"}')
-    assert server._resume_lost("sol-pi", [], "known-session", str(root)) is None
-    assert server._resume_lost("sol-pi", [], "unknown-session", str(root)) == "unknown-session"
+    assert server._resume_lost("pi-lab", [], "known-session", str(root)) is None
+    assert server._resume_lost("pi-lab", [], "unknown-session", str(root)) == "unknown-session"
     with TestClient(server.app) as client:
-        response = client.get("/checkpoint?identifier=solpi-test")
+        response = client.get("/checkpoint?identifier=pilab-test")
         assert response.status_code == 200, response.text
         with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
             names = archive.getnames()
@@ -40,10 +40,10 @@ def test_checkpoint_excludes_credentials_but_restores_conversation(tmp_path, mon
             for member in archive.getmembers():
                 if member.isfile():
                     assert b"SECRET_SENTINEL" not in archive.extractfile(member).read(), member.name
-        assert client.delete("/workspace?identifier=solpi-test").status_code == 200
-        assert server._resume_lost("sol-pi", [], "known-session", str(root)) == "known-session"
-        assert client.post("/hydrate?identifier=solpi-test", content=response.content).status_code == 200
-    assert server._resume_lost("sol-pi", [], "known-session", str(root)) is None
+        assert client.delete("/workspace?identifier=pilab-test").status_code == 200
+        assert server._resume_lost("pi-lab", [], "known-session", str(root)) == "known-session"
+        assert client.post("/hydrate?identifier=pilab-test", content=response.content).status_code == 200
+    assert server._resume_lost("pi-lab", [], "known-session", str(root)) is None
     assert not (agent / "models.json").exists()
 
 
@@ -53,10 +53,10 @@ def test_provider_failure_and_model_substitution_are_not_success():
         ({"model": "substituted", "content": [{"type": "text", "text": "hello"}]}, "instead of"),
     ]:
         state = {"model": "main"}
-        _sol_pi_to_claude({"type": "sol_pi_ready", "config": {}, "revision": "test"}, state)
-        _sol_pi_to_claude({"type": "message_end", "message": {"role": "assistant", **message}}, state)
-        _sol_pi_to_claude({"type": "agent_end"}, state)
-        result, = _sol_pi_eof(state, 0)
+        _pi_lab_to_claude({"type": "pi_lab_ready", "config": {}, "revision": "test"}, state)
+        _pi_lab_to_claude({"type": "message_end", "message": {"role": "assistant", **message}}, state)
+        _pi_lab_to_claude({"type": "agent_end"}, state)
+        result, = _pi_lab_eof(state, 0)
         assert result["is_error"] and expected in result["result"]
 
 
@@ -66,8 +66,8 @@ def installed(tmp_path, monkeypatch):
     entry = tmp_path / "upstream.ts"
     binary.touch()
     entry.write_text("export const createSolPiExtension = () => {};", encoding="utf-8")
-    monkeypatch.setenv("HR_SOL_PI_BIN", str(binary))
-    monkeypatch.setenv("HR_SOL_PI_ENTRY", str(entry))
+    monkeypatch.setenv("HR_PI_LAB_BIN", str(binary))
+    monkeypatch.setenv("HR_PI_LAB_SOL_PI_ENTRY", str(entry))
     return tmp_path, {"HOME": str(tmp_path / ".harness/home")}
 
 
@@ -81,11 +81,11 @@ def test_independent_identity_and_storage(installed):
     root, env = installed
     cmd = launch(installed, resume_session_id="session-123")
     assert cmd[0] == str(root / "pi")
-    assert BACKENDS["sol-pi"]["normalize"] is not BACKENDS["pi"]["normalize"]
-    assert pathlib.Path(env["PI_CODING_AGENT_DIR"]).parts[-2:] == (".sol-pi", "agent")
+    assert BACKENDS["pi-lab"]["normalize"] is not BACKENDS["pi"]["normalize"]
+    assert pathlib.Path(env["PI_CODING_AGENT_DIR"]).parts[-2:] == (".pi-lab", "agent")
     assert not (root / ".harness/home/.pi").exists()
     assert cmd[cmd.index("--session-id") + 1] == "session-123"
-    cfg = json.loads((root / ".harness/sol-pi/effective-config.json").read_text())
+    cfg = json.loads((root / ".harness/pi-lab/effective-config.json").read_text())
     assert all(cfg[k] for k in FEATURES)
     assert cfg["evidencePreservingReducerProvider"] == "hr"
     assert cfg["evidencePreservingReducerModel"] == "main-model"
@@ -95,8 +95,8 @@ def test_independent_identity_and_storage(installed):
 def test_all_switch_combinations_reach_upstream_factory(installed, mask):
     flags = {k: bool(mask & (1 << i)) for i, k in enumerate(FEATURES)}
     launch(installed, config=flags)
-    wrapper = (installed[0] / ".harness/sol-pi/extension.ts").read_text()
-    cfg = json.loads((installed[0] / ".harness/sol-pi/effective-config.json").read_text())
+    wrapper = (installed[0] / ".harness/pi-lab/extension.ts").read_text()
+    cfg = json.loads((installed[0] / ".harness/pi-lab/effective-config.json").read_text())
     assert {k: cfg[k] for k in FEATURES} == flags
     assert "registerConfiguredFeatures(observed, config)" in wrapper
 
@@ -115,7 +115,7 @@ def test_switches_cannot_bypass_tool_policy(installed, tool):
 
 
 def test_missing_runtime_does_not_fall_back_to_pi(monkeypatch, tmp_path):
-    monkeypatch.delenv("HR_SOL_PI_BIN", raising=False)
+    monkeypatch.delenv("HR_PI_LAB_BIN", raising=False)
     with pytest.raises(HTTPException) as exc:
         launch((tmp_path, {"HOME": str(tmp_path)}))
     assert exc.value.status_code == 503
@@ -128,7 +128,7 @@ def test_invalid_config_rejected(cfg):
         normalize_config(cfg)
 
 
-def test_original_pi_loads_no_sol_pi(installed):
+def test_original_pi_loads_no_pi_lab(installed):
     root, env = installed
     cmd = _build_pi("openai", Auth(api_key="test"), "main", "hi", str(root), env)
     assert cmd[0] == "pi" and "--extension" not in cmd
@@ -136,20 +136,20 @@ def test_original_pi_loads_no_sol_pi(installed):
 
 
 def test_compaction_continuation_has_one_terminal_event_and_aux_usage():
-    state = {"model": "main", "final": "", "_sol_pi_ready": {"revision": "test"}}
+    state = {"model": "main", "final": "", "_pi_lab_ready": {"revision": "test"}}
     for text in ["first phase", "final answer"]:
-        _sol_pi_to_claude({"type": "message_end", "message": {"role": "assistant", "model": "main",
+        _pi_lab_to_claude({"type": "message_end", "message": {"role": "assistant", "model": "main",
                            "content": [{"type": "text", "text": text}], "usage": {"input": 10, "output": 2}}}, state)
-        assert _sol_pi_to_claude({"type": "agent_end"}, state) == []
-    _sol_pi_to_claude({"type": "sol_pi_event", "kind": "provider_response", "provider": "hr",
+        assert _pi_lab_to_claude({"type": "agent_end"}, state) == []
+    _pi_lab_to_claude({"type": "pi_lab_event", "kind": "provider_response", "provider": "hr",
                        "model": "small", "usage": {"input": 100, "output": 5}}, state)
-    _sol_pi_to_claude({"type": "sol_pi_event", "kind": "applied", "usage": {"input": 100}}, state)
-    result, = _sol_pi_eof(state, 0)
+    _pi_lab_to_claude({"type": "pi_lab_event", "kind": "applied", "usage": {"input": 100}}, state)
+    result, = _pi_lab_eof(state, 0)
     assert result["result"] == "final answer"
     assert result["usage"]["input_tokens"] == 20
-    assert result["sol_pi"]["auxiliary_usage"]["hr/small"]["input"] == 100
+    assert result["pi_lab"]["auxiliary_usage"]["hr/small"]["input"] == 100
 
 
 def test_premature_exit_is_not_success():
-    result, = _sol_pi_eof({"model": "main"}, 0)
+    result, = _pi_lab_eof({"model": "main"}, 0)
     assert result["is_error"]

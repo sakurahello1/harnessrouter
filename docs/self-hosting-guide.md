@@ -1025,6 +1025,6 @@ The agent CLIs are **not** redistributed here; they are installed on first run u
 licenses. Review them before enabling a backend.
 
 
-SoL-Pi (MIT) is installed independently of Pi with a locked dependency graph and
-source checksums. See [the SoL-Pi guide](sol-pi.md) for its four mechanism switches,
-installation details and current acceptance status.
+Pi Lab (Pi with NVIDIA SoL-Pi's mechanisms, both MIT) is installed independently of Pi with a
+locked dependency graph and source checksums. See [the Pi Lab guide](pi-lab.md) for its
+mechanism switches, installation details and current acceptance status.

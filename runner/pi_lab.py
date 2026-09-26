@@ -1,4 +1,4 @@
-"""Independent SoL-Pi backend; only the Pi transport is shared with ordinary Pi."""
+"""Independent Pi Lab backend; only the Pi transport is shared with ordinary Pi."""
 import json
 import math
 import os
@@ -15,7 +15,7 @@ def session_present(cwd: str, session_id: str) -> bool:
     """Pi 0.85.1 reads the session header id and cwd, not a filename substring."""
     resolved = os.path.abspath(cwd)
     slug = "--" + re.sub(r"[/\\:]", "-", re.sub(r"^[/\\]", "", resolved)) + "--"
-    sessions = Path(cwd) / ".harness/home/.sol-pi/agent/sessions" / slug
+    sessions = Path(cwd) / ".harness/home/.pi-lab/agent/sessions" / slug
     for path in sessions.glob("*.jsonl"):
         try:
             with path.open(encoding="utf-8") as stream:
@@ -31,13 +31,13 @@ def session_present(cwd: str, session_id: str) -> bool:
 def normalize_config(value=None):
     value = {} if value is None else value
     if not isinstance(value, dict):
-        raise HTTPException(400, "sol_pi must be an object")
+        raise HTTPException(400, "pi_lab must be an object")
     allowed = {*FEATURES, "cacheWriteReadRatio", "reducerModel"}
     if set(value) - allowed:
-        raise HTTPException(400, "Unknown sol_pi fields: " + ", ".join(sorted(set(value) - allowed)))
+        raise HTTPException(400, "Unknown pi_lab fields: " + ", ".join(sorted(set(value) - allowed)))
     config = {key: value.get(key, True) for key in FEATURES}
     if any(type(v) is not bool for v in config.values()):
-        raise HTTPException(400, "SoL-Pi feature switches must be boolean")
+        raise HTTPException(400, "Pi Lab mechanism switches must be boolean")
     ratio = value.get("cacheWriteReadRatio", 12.5)
     if type(ratio) not in (float, int) or not math.isfinite(ratio) or ratio < 0:
         raise HTTPException(400, "cacheWriteReadRatio must be finite and non-negative")
@@ -60,14 +60,14 @@ def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
         raise HTTPException(400, "ObservationPack requires obs_recall")
     if config["onlineContextCompact"] and "update_plan" in disabled:
         raise HTTPException(400, "Online Context Compact requires update_plan")
-    binary = os.environ.get("HR_SOL_PI_BIN", "")
-    entry = Path(os.environ.get("HR_SOL_PI_ENTRY", ""))
+    binary = os.environ.get("HR_PI_LAB_BIN", "")
+    entry = Path(os.environ.get("HR_PI_LAB_SOL_PI_ENTRY", ""))
     if not binary or not Path(binary).is_file() or not entry.is_file():
-        raise HTTPException(503, "SoL-Pi is not installed; configure HR_SOL_PI_BIN and HR_SOL_PI_ENTRY")
-    agent_dir = Path(env.get("HOME") or cwd) / ".sol-pi" / "agent"
-    mcp_extension = os.environ.get("HR_SOL_PI_MCP_EXT", "")
+        raise HTTPException(503, "Pi Lab is not installed; configure HR_PI_LAB_BIN and HR_PI_LAB_SOL_PI_ENTRY")
+    agent_dir = Path(env.get("HOME") or cwd) / ".pi-lab" / "agent"
+    mcp_extension = os.environ.get("HR_PI_LAB_MCP_EXT", "")
     if mcp_servers and not (mcp_extension and Path(mcp_extension).exists()):
-        raise HTTPException(503, "SoL-Pi MCP adapter is not installed; configure HR_SOL_PI_MCP_EXT")
+        raise HTTPException(503, "Pi Lab MCP adapter is not installed; configure HR_PI_LAB_MCP_EXT")
     cmd = build_pi(provider, auth, model, prompt, cwd, env,
                    resume_session_id=resume_session_id, mcp_servers=mcp_servers,
                    tools_disabled=tools_disabled, vision=vision, agent_dir=agent_dir,
@@ -83,7 +83,7 @@ def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
         main = models["providers"]["hr"]["models"][0]
         models["providers"]["hr"]["models"].append({**main, "id": reducer_model, "name": reducer_model})
         path.write_text(json.dumps(models), encoding="utf-8")
-    managed = Path(cwd) / ".harness" / "sol-pi"
+    managed = Path(cwd) / ".harness" / "pi-lab"
     managed.mkdir(parents=True, exist_ok=True)
     # Inject configuration via the upstream registration API: a task-created project config
     # cannot override the harness switches. The wrapper is rewritten before every invocation.
@@ -96,7 +96,7 @@ def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
         "  observed.appendEntry = (type, data) => {\n"
         "    pi.appendEntry(type, data);\n"
         "    if (type === 'sol-pi-evidence-preserving-reducer-v1') {\n"
-        "      const event = { type: 'sol_pi_event', kind: data.kind, reason: data.reason };\n"
+        "      const event = { type: 'pi_lab_event', kind: data.kind, reason: data.reason };\n"
         "      if (data.kind === 'provider_response') Object.assign(event, {usage: data.usage, model: data.model, provider: data.provider});\n"
         "      process.stdout.write(JSON.stringify(event) + '\\n');\n"
         "    }\n"
@@ -105,7 +105,7 @@ def build(build_pi, provider, auth, model, prompt, cwd, env, *, config=None,
         "  pi.on('session_start', () => {\n"
         "    if (initialized) return; initialized = true;\n"
         "    registerConfiguredFeatures(observed, config);\n"
-        "    process.stdout.write(JSON.stringify({type: 'sol_pi_ready', config, revision: " + json.dumps(REVISION) + "}) + '\\n');\n"
+        "    process.stdout.write(JSON.stringify({type: 'pi_lab_ready', config, revision: " + json.dumps(REVISION) + "}) + '\\n');\n"
         "  });\n"
         "}\n",
         encoding="utf-8")

@@ -1,6 +1,6 @@
-"""Exercise the installed SoL-Pi CLI against a local scripted provider, without API spend.
+"""Exercise the installed Pi Lab CLI against a local scripted provider, without API spend.
 
-Set HR_SOL_PI_BIN and HR_SOL_PI_ENTRY to the pinned runtime and upstream entrypoint.
+Set HR_PI_LAB_BIN and HR_PI_LAB_SOL_PI_ENTRY to the pinned runtime and upstream entrypoint.
 Run with the runner's Python dependencies installed. This validates integration, not quality.
 """
 import json
@@ -14,8 +14,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "runner"))
-from server import Auth, CHECKPOINT_EXCLUDE, _build_pi, _sol_pi_to_claude, _sol_pi_eof
-from sol_pi import FEATURES, build, session_present
+from server import Auth, CHECKPOINT_EXCLUDE, _build_pi, _pi_lab_to_claude, _pi_lab_eof
+from pi_lab import FEATURES, build, session_present
 
 requests = []
 mode = "full"
@@ -63,7 +63,7 @@ def main():
     try:
         for mode in ("full", "off", "reducer"):
             requests.clear()
-            with tempfile.TemporaryDirectory(prefix="hr-solpi-smoke-") as temp:
+            with tempfile.TemporaryDirectory(prefix="hr-pilab-smoke-") as temp:
                 root = Path(temp)
                 # A conflicting task config must not override the managed switches.
                 (root / ".pi").mkdir()
@@ -86,19 +86,19 @@ def main():
                     assert (root / "artifact.txt").read_text() == "artifact evidence", proc.stdout
                 assert (root / "fused.txt").exists() == (mode == "full"), proc.stdout
                 state = {"model": "test-model", "final": ""}
-                normalized = [out for event in events for out in _sol_pi_to_claude(event, state)]
+                normalized = [out for event in events for out in _pi_lab_to_claude(event, state)]
                 assert not any(e["type"] == "result" for e in normalized)
-                result, = _sol_pi_eof(state, proc.returncode)
+                result, = _pi_lab_eof(state, proc.returncode)
                 assert not result["is_error"] and result["result"] == "SMOKE_OK", (result, proc.stderr)
                 if mode == "reducer":
                     assert any(r["model"] == "small-model" for r in requests)
-                    assert result["sol_pi"]["auxiliary_usage"]["hr/small-model"]["input"] == 20
-                    assert any(e.get("type") == "sol_pi_event" and e.get("kind") == "fallback" for e in events)
+                    assert result["pi_lab"]["auxiliary_usage"]["hr/small-model"]["input"] == 20
+                    assert any(e.get("type") == "pi_lab_event" and e.get("kind") == "fallback" for e in events)
                     assert "ERROR_MARKER" in json.dumps(requests[-1]["messages"]), "Fallback lost source evidence"
                 sid = next(e["id"] for e in events if e.get("type") == "session")
                 assert session_present(temp, sid), "Session lookup disagrees with the pinned CLI"
                 # A fresh CLI process after deleting/restoring the workspace must recover history.
-                with tempfile.TemporaryDirectory(prefix="hr-solpi-checkpoint-") as backup:
+                with tempfile.TemporaryDirectory(prefix="hr-pilab-checkpoint-") as backup:
                     archive = str(Path(backup) / "workspace.tgz")
                     subprocess.run(["tar", "-czf", archive, *[f"--exclude={p}" for p in CHECKPOINT_EXCLUDE],
                                     "-C", temp, "."], check=True)
@@ -106,7 +106,7 @@ def main():
                     root.mkdir()
                     subprocess.run(["tar", "-xzf", archive, "-C", temp], check=True)
                 assert session_present(temp, sid)
-                assert not (root / ".harness/home/.sol-pi/agent/models.json").exists()
+                assert not (root / ".harness/home/.pi-lab/agent/models.json").exists()
                 for model in ("test-model", "other-model", "test-model"):
                     before = len(requests)
                     cmd = build(_build_pi, "openai-api", auth, model, "Continue our conversation.", temp, env,

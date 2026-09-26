@@ -1,5 +1,9 @@
 # SoL-Pi local verification — 2026-09-25
 
+These records were taken before the backend was renamed from `sol-pi` to `pi-lab`
+([Pi Lab](../../pi-lab.md)). They are kept as recorded, with the old id, harness
+and path names; a re-run under `pi-lab` is recorded separately.
+
 Environment: dedicated self-hosted local gateway/runner/console, only one provider
 integration, pinned Pi 0.85.1 and NVlabs SoL-Pi 1559b5cb12c72da4a485bc50fe326586b216fb19.
 This certifies a connection/model combination, not the inherited full Pi catalog.
@@ -38,7 +42,7 @@ only one paid model was authorized; scripted switch/back is separate evidence.
 Settings browser smoke passed independent base, default switches, save/reload,
 zero cache ratio, reducer model and read-only built-in defaults.
 
-Full image/self-host result is recorded in ../../sol-pi.md. No benchmark quality,
+Full image/self-host result is recorded in ../../pi-lab.md. No benchmark quality,
 long-context quality or speed claim is made by this acceptance run.
 
 ## Container details

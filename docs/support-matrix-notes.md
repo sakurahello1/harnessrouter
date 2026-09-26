@@ -1358,6 +1358,9 @@ runs on a Calibrator on the claude base with the calibrate package.
 
 ## sol-pi — Banban / DeepSeek V4.1 Flash, 2026-09-25
 
+Recorded under the backend's first id, `sol-pi`; it has since been renamed `pi-lab`
+(see [Pi Lab](pi-lab.md)) and this column is to be re-run under the new id.
+
 Independent backend: Pi 0.85.1 and NVlabs/SoL-Pi
 1559b5cb12c72da4a485bc50fe326586b216fb19, with four configurable mechanisms.
 Pi transport/normalization are reused; SoL-Pi waits for process EOF because native
@@ -1387,7 +1390,7 @@ in [the verification record](verification/sol-pi-2026-09-25/README.md).
 Local regression: 1,195 passed / 19 skipped; final locked runtime installation,
 scripted CLI restore/switch/reducer checks, UI type-check/build and settings smoke
 passed. These do not certify the broader inherited Pi model catalog. See
-[SoL-Pi integration](sol-pi.md) for configuration, remaining acceptance limits,
+[Pi Lab](pi-lab.md) for configuration, remaining acceptance limits,
 and separate auxiliary reducer accounting.
 
 Core container build/self-host acceptance passed with document preview, media,

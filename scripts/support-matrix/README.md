@@ -34,7 +34,7 @@ from another instance, since each reaches providers by its own path. Retest a ba
 before excluding a model.
 
 For `custom-harness.mjs`, set `MODEL` to save an explicit default model on each
-temporary harness (for example `MODEL=deepseek-v4.1-flash BASES=sol-pi`). Omit it
+temporary harness (for example `MODEL=deepseek-v4.1-flash BASES=pi-lab`). Omit it
 to retain each base's default. This avoids testing an unavailable default on a
 single-model connection.
 

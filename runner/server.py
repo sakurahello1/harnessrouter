@@ -72,7 +72,7 @@ import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sol_pi import session_present as _sol_pi_session_present
+from pi_lab import session_present as _pi_lab_session_present
 
 app = FastAPI(title="harness-runner")
 
@@ -301,7 +301,7 @@ def _openhands_session_present(cwd: str, cmd: list[str], session_id: str) -> boo
 
 
 _SESSION_PRESENT = {
-    "sol-pi": lambda cwd, cmd, sid: _sol_pi_session_present(cwd, sid),
+    "pi-lab": lambda cwd, cmd, sid: _pi_lab_session_present(cwd, sid),
     "claude": _argv_session_present,
     "opencode": _argv_session_present,
     "goose": _goose_session_present,
@@ -472,9 +472,9 @@ CHECKPOINT_EXCLUDE = ["./tmp", "./.gcp-sa.json", "./.codex", "./.credentials.jso
                       # key for custom providers — neither may travel in a checkpoint tarball.
                       "./.harness/home/.pi/agent/auth.json",
                       "./.harness/home/.pi/agent/models.json",
-                      "./.harness/home/.sol-pi/agent/auth.json",
-                      "./.harness/home/.sol-pi/agent/models.json",
-                      "./.harness/home/.sol-pi/agent/mcp.json",
+                      "./.harness/home/.pi-lab/agent/auth.json",
+                      "./.harness/home/.pi-lab/agent/models.json",
+                      "./.harness/home/.pi-lab/agent/mcp.json",
                       # omp models / auth
                       "./.harness/home/.omp/agent/auth.json",
                       "./.harness/home/.omp/agent/models.json",
@@ -514,7 +514,7 @@ CODEX_DEFAULT_MODEL = os.environ.get("CODEX_DEFAULT_MODEL", "gpt-5.4")
 HERMES_DEFAULT_MODEL = os.environ.get("HERMES_DEFAULT_MODEL", "gpt-5.4")
 # Pi default — pi is multi-family the same way hermes is; same reasoning, same default.
 PI_DEFAULT_MODEL = os.environ.get("PI_DEFAULT_MODEL", "gpt-5.4")
-SOL_PI_DEFAULT_MODEL = os.environ.get("SOL_PI_DEFAULT_MODEL", "gpt-5.4")
+PI_LAB_DEFAULT_MODEL = os.environ.get("PI_LAB_DEFAULT_MODEL", "gpt-5.4")
 OPENCODE_DEFAULT_MODEL = os.environ.get("OPENCODE_DEFAULT_MODEL", "gpt-5.4")
 QWEN_DEFAULT_MODEL = os.environ.get("QWEN_DEFAULT_MODEL", "qwen3.7-max")
 GEMINI_DEFAULT_MODEL = os.environ.get("GEMINI_DEFAULT_MODEL", "gemini-3.8-flash")
@@ -621,8 +621,8 @@ def _git_ensure(ws: str) -> None:
         "tmp/", ".gcp-sa.json", ".codex/", ".credentials.json", ".harness/**/.credentials.json",
         ".harness/home/.hermes/.env", ".harness/home/.hermes/auth.json",
         ".harness/home/.pi/agent/auth.json", ".harness/home/.pi/agent/models.json",
-        ".harness/home/.sol-pi/agent/auth.json", ".harness/home/.sol-pi/agent/models.json",
-        ".harness/home/.sol-pi/agent/mcp.json",
+        ".harness/home/.pi-lab/agent/auth.json", ".harness/home/.pi-lab/agent/models.json",
+        ".harness/home/.pi-lab/agent/mcp.json",
         ".harness/goose/config/secrets.yaml",
         "# harness: the CLI home is checkpointed by tar, not by this repo (see _git_ensure)",
         ".harness/home/",
@@ -894,9 +894,9 @@ def _write_skills(cwd: str, skills: list[dict], backend: str = "claude") -> list
     if backend == "claude":
         rootrels = [".harness/home/.claude/skills", ".claude/skills"]
         entryroot = ".claude/skills"
-    elif backend == "sol-pi":
-        rootrels = [".harness/home/.sol-pi/agent/skills"]
-        entryroot = ".harness/home/.sol-pi/agent/skills"
+    elif backend == "pi-lab":
+        rootrels = [".harness/home/.pi-lab/agent/skills"]
+        entryroot = ".harness/home/.pi-lab/agent/skills"
     elif backend == "pi":
         rootrels = [".harness/home/.pi/agent/skills"]
         entryroot = ".harness/home/.pi/agent/skills"
@@ -1284,7 +1284,7 @@ def _agent_doc_path(cwd: str, backend: str) -> pathlib.Path:
         # "<!-- From: .../AGENTS.md -->" fence, with a behavioural instruction in it obeyed.
         # aider has no instruction-file convention of its own (no AGENTS.md discovery, no
         # CLAUDE.md): the file is written here and the driver puts it into aider's system message.
-        "AGENTS.md" if backend in ("codex", "hermes", "pi", "sol-pi", "dsh", "opencode", "cline", "omp",
+        "AGENTS.md" if backend in ("codex", "hermes", "pi", "pi-lab", "dsh", "opencode", "cline", "omp",
                                    "goose", "kimi", "aider", "openhands")
         else "CLAUDE.md")
 
@@ -2578,44 +2578,44 @@ def _pi_to_claude(obj: dict, state: dict) -> list[dict]:
     return []
 
 
-def _sol_pi_to_claude(obj: dict, state: dict) -> list[dict]:
+def _pi_lab_to_claude(obj: dict, state: dict) -> list[dict]:
     # Native compaction can start another agent turn inside the same Pi process.
-    # Only process EOF is terminal for SoL-Pi; do not complete an HTTP stream early.
-    if obj.get("type") == "sol_pi_ready":
-        state["_sol_pi_ready"] = {"config": obj.get("config"), "revision": obj.get("revision")}
-        return [{**obj, "type": "system", "subtype": "sol_pi_ready"}]
+    # Only process EOF is terminal for Pi Lab; do not complete an HTTP stream early.
+    if obj.get("type") == "pi_lab_ready":
+        state["_pi_lab_ready"] = {"config": obj.get("config"), "revision": obj.get("revision")}
+        return [{**obj, "type": "system", "subtype": "pi_lab_ready"}]
     if obj.get("type") == "agent_end":
-        state["_sol_pi_agent_end"] = True
+        state["_pi_lab_agent_end"] = True
         return []
-    if obj.get("type") == "sol_pi_event":
+    if obj.get("type") == "pi_lab_event":
         if obj.get("kind") == "provider_response":
             route = f"{obj.get('provider', '')}/{obj.get('model', '')}"
-            totals = state.setdefault("_sol_pi_aux", {}).setdefault(route, {})
+            totals = state.setdefault("_pi_lab_aux", {}).setdefault(route, {})
             for key in ("input", "output", "cacheRead", "cacheWrite"):
                 value = (obj.get("usage") or {}).get(key, 0)
                 if isinstance(value, (int, float)) and value >= 0:
                     totals[key] = totals.get(key, 0) + value
-        return [{**obj, "type": "system", "subtype": "sol_pi_reducer"}]
+        return [{**obj, "type": "system", "subtype": "pi_lab_reducer"}]
     return _pi_to_claude(obj, state)
 
 
-def _sol_pi_eof(state: dict, rc: int) -> list[dict]:
-    if not state.get("_sol_pi_ready"):
-        state["_pi_error"] = "SoL-Pi extension did not initialize; check the pinned runtime and extension installation"
+def _pi_lab_eof(state: dict, rc: int) -> list[dict]:
+    if not state.get("_pi_lab_ready"):
+        state["_pi_error"] = "Pi Lab's SoL-Pi extension did not initialize; check the pinned runtime and extension installation"
     if rc and not state.get("_pi_error"):
-        state["_pi_error"] = f"SoL-Pi exited with code {rc}"
-    if not state.get("_sol_pi_agent_end") and not state.get("_pi_error"):
-        state["_pi_error"] = "SoL-Pi ended without an agent_end event"
+        state["_pi_error"] = f"Pi Lab exited with code {rc}"
+    if not state.get("_pi_lab_agent_end") and not state.get("_pi_error"):
+        state["_pi_error"] = "Pi Lab ended without an agent_end event"
     events = _pi_to_claude({"type": "agent_end"}, state)
     for event in events:
         # Auxiliary models have their own rates. Preserve their usage separately rather
         # than charge their tokens at the main model's rate or call main-only cost total.
-        event["sol_pi"] = {**state.get("_sol_pi_ready", {}), "auxiliary_usage": state.get("_sol_pi_aux", {}),
+        event["pi_lab"] = {**state.get("_pi_lab_ready", {}), "auxiliary_usage": state.get("_pi_lab_aux", {}),
                            "main_usage_excludes_auxiliary": True}
     return events
 
 
-_sol_pi_to_claude.eof = _sol_pi_eof
+_pi_lab_to_claude.eof = _pi_lab_eof
 
 
 # ── omp (Oh My Pi, can1357/oh-my-pi CLI) ─────────────────────────────────────────
@@ -6166,8 +6166,8 @@ BACKENDS = {
                "normalize": None},
     "pi": {"providers": sorted(PI_PROVIDERS), "default_model": PI_DEFAULT_MODEL,
            "normalize": _pi_to_claude},
-    "sol-pi": {"providers": sorted(PI_PROVIDERS), "default_model": SOL_PI_DEFAULT_MODEL,
-               "normalize": _sol_pi_to_claude},
+    "pi-lab": {"providers": sorted(PI_PROVIDERS), "default_model": PI_LAB_DEFAULT_MODEL,
+               "normalize": _pi_lab_to_claude},
     "dsh": {"providers": sorted(DSH_PROVIDERS), "default_model": DSH_DEFAULT_MODEL,
             "normalize": _dsh_to_claude},
     "opencode": {"providers": sorted(OPENCODE_PROVIDERS), "default_model": OPENCODE_DEFAULT_MODEL,
@@ -7299,7 +7299,7 @@ def capabilities(identifier: str = "") -> dict:
 
 
 class TurnReq(BaseModel):
-    sol_pi: dict | None = None            # independent sol-pi backend only
+    pi_lab: dict | None = None            # independent pi-lab backend only
     backend: str = "claude"          # claude | codex | hermes | pi | dsh
     provider: str | None = None      # see BACKENDS[...].providers
     model: str | None = None
@@ -7353,8 +7353,8 @@ def turn(req: TurnReq, identifier: str = "") -> dict:
     spec = BACKENDS.get(backend)
     if not spec:
         raise HTTPException(400, f"unknown backend '{backend}' (one of {sorted(BACKENDS)})")
-    if req.sol_pi is not None and backend != "sol-pi":
-        raise HTTPException(400, "sol_pi configuration requires the sol-pi backend")
+    if req.pi_lab is not None and backend != "pi-lab":
+        raise HTTPException(400, "pi_lab configuration requires the pi-lab backend")
     cwd = req.cwd or _ws(identifier)
     if _SESSION_UIDS and req.cwd and os.path.realpath(req.cwd) != os.path.realpath(_ws(identifier)):
         # Behind the wall the directory decides which uid a turn runs as; a caller-chosen one
@@ -7473,11 +7473,11 @@ def turn(req: TurnReq, identifier: str = "") -> dict:
         cmd = _build_dsh(req.provider, auth, model, req.prompt, cwd, env,
                          resume_session_id=req.resume_session_id, mcp_servers=req.mcp_servers,
                          vision=bool(req.vision))
-    elif backend == "sol-pi":
-        from sol_pi import build as build_sol_pi
-        model = model or SOL_PI_DEFAULT_MODEL
-        cmd = build_sol_pi(_build_pi, req.provider, auth, model, req.prompt, cwd, env,
-                           config=req.sol_pi, resume_session_id=req.resume_session_id,
+    elif backend == "pi-lab":
+        from pi_lab import build as build_pi_lab
+        model = model or PI_LAB_DEFAULT_MODEL
+        cmd = build_pi_lab(_build_pi, req.provider, auth, model, req.prompt, cwd, env,
+                           config=req.pi_lab, resume_session_id=req.resume_session_id,
                            mcp_servers=req.mcp_servers, tools_disabled=req.tools_disabled, vision=bool(req.vision))
     elif backend == "pi":
         model = model or PI_DEFAULT_MODEL

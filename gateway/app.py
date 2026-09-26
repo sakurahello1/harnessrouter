@@ -1252,7 +1252,7 @@ _INTEGRATION_WIRING: dict[tuple[str, str], str] = {
     # systemone base too: decisions at <base>/systemone, billed to the key's credits (2026-09-24).
     ("harnessrouter", "systemone"): "typesafe",
 }
-_INTEGRATION_WIRING.update({(provider, "sol-pi"): route
+_INTEGRATION_WIRING.update({(provider, "pi-lab"): route
                             for (provider, backend), route in list(_INTEGRATION_WIRING.items()) if backend == "pi"})
 
 
@@ -4845,9 +4845,9 @@ _CUSTOM_FORMAT_BACKENDS = {
     # OPENAI_BASE_PATH through the relay). Its own anthropic provider takes ANTHROPIC_HOST with no
     # base-path counterpart and is unprobed, so a custom ANTHROPIC endpoint stays off this set
     # until it is — the picker greys out what the router cannot actually run.
-    "openai": {"hermes", "opencode", "pi", "sol-pi", "dsh", "qwen", "cline", "omp", "goose", "kimi", "aider",
+    "openai": {"hermes", "opencode", "pi", "pi-lab", "dsh", "qwen", "cline", "omp", "goose", "kimi", "aider",
                "openhands"},
-    "anthropic": {"claude", "opencode", "pi", "sol-pi", "dsh", "omp"},
+    "anthropic": {"claude", "opencode", "pi", "pi-lab", "dsh", "omp"},
     # The OpenAI Responses API: what codex speaks, and only codex among the agent CLIs here.
     "responses": {"codex"},
 }
@@ -6193,7 +6193,7 @@ def _map_model(conn: dict, friendly: str) -> str | None:
     table = _vendor_models(provider)
     if friendly and friendly in table:
         return table[friendly]
-    if backend == "claude" or (backend in ("hermes", "pi", "sol-pi", "dsh", "omp") and provider in ("anthropic", "bedrock")):
+    if backend == "claude" or (backend in ("hermes", "pi", "pi-lab", "dsh", "omp") and provider in ("anthropic", "bedrock")):
         # Older claude ids the catalog no longer lists still map, and a caller may pass a
         # provider-native id directly; _LEGACY_CLAUDE_IDS carries both, keyed bare (opus-4.5).
         legacy = _BEDROCK_CLAUDE if provider == "bedrock" else _ANTHROPIC_CLAUDE
@@ -6526,7 +6526,7 @@ _MODEL_CATALOG: dict[str, dict] = {
                          "hunyuan-3", "ling-3.0-flash", "minimax-m3", "nemotron-3-ultra", "qwen3.7-flash",
                          "deepseek-v4.1-flash", "qwen3.8-flash", "qwen3.8-27b", "qwen3.7-plus", "hunyuan-4-preview", "nemotron-3.5-lightning", "nemotron-3-super", "grok-4.6", "grok-4.5", "grok-4.3", "grok-4.20", "grok-build-0.1", "muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1", "muse-glimmer-30b", "llama-4-maverick", "llama-3.3-70b"]},
 }
-_MODEL_CATALOG["sol-pi"] = {**_MODEL_CATALOG["pi"], "models": list(_MODEL_CATALOG["pi"]["models"])}
+_MODEL_CATALOG["pi-lab"] = {**_MODEL_CATALOG["pi"], "models": list(_MODEL_CATALOG["pi"]["models"])}
 _MODEL_CATALOG["omp"]["models"] = list(_MODEL_CATALOG["pi"]["models"])   # pi's reach, see the omp entry
 # systemone: Jev's ids across its two providers. `jev-latest` is served by both (TypeSafe's own API,
 # and OpenRouter's rolling alias of the same model) and is the default, so a harness made on either
@@ -6545,7 +6545,7 @@ _MODEL_CATALOG["systemone"] = {"default": "jev-latest",
 # pi (it writes output.txt) and a switch under hermes.
 _NOT_OFFERED: dict[str, frozenset[str]] = {
     "qwen": frozenset({"llama-4-maverick"}), "goose": frozenset({"llama-3.3-70b"}),
-    "hermes": frozenset({"llama-3.3-70b"}), "pi": frozenset({"llama-3.3-70b"}), "sol-pi": frozenset({"llama-3.3-70b"}),
+    "hermes": frozenset({"llama-3.3-70b"}), "pi": frozenset({"llama-3.3-70b"}), "pi-lab": frozenset({"llama-3.3-70b"}),
 }
 for _b, _e in _MODEL_CATALOG.items():
     _gone = _NOT_OFFERED.get(_b, frozenset())
@@ -6561,7 +6561,7 @@ RESPONSES_ONLY_MODELS = frozenset({"gpt-5.3-codex", "gpt-6-astra"})
 # aider and openhands speak chat/completions through litellm's openai provider (the id is sent
 # `openai/<id>`), so a Responses-API-only id would be a picker row that fails on send.
 CHAT_ONLY_BACKENDS = ("qwen", "cline", "goose", "kimi", "aider", "openhands")
-_BARE_MODELS = {"", "claude", "codex", "anthropic", "bedrock", "openai", "hermes", "pi", "sol-pi", "dsh", "deepseek", "omp"}
+_BARE_MODELS = {"", "claude", "codex", "anthropic", "bedrock", "openai", "hermes", "pi", "pi-lab", "dsh", "deepseek", "omp"}
 # Models whose serving CHANNEL refuses image input outright. Measured, not assumed — probed
 # 2026-08-19 on the TokenRouter connection with a data-URI image in a user message:
 #   qwen3.7-max  -> 400 InvalidParameter "Unexpected item type in content"  (rejects the TYPE)
@@ -6651,7 +6651,7 @@ def _conn_serves(conn: dict, friendly: str) -> bool:
 
 
 def _backend_of_builtin(harness_id: str) -> str:
-    """Backend for a BUILT-IN harness, whose id is its base id ("opencode", "pi", "sol-pi", "dsh", ...).
+    """Backend for a BUILT-IN harness, whose id is its base id ("opencode", "pi", "pi-lab", "dsh", ...).
 
     Built-ins have no stored Harness vertex — the console renders them from the catalogue — so
     _backend_of_harness sees None and the caller used to fall through to guessing the backend from
@@ -6692,9 +6692,9 @@ def _model_authorized(requested: str, backend: str) -> bool:
         return False
     if r in {m.lower() for m in _MODEL_CATALOG.get(backend, {}).get("models", [])}:
         return True
-    if backend in ("claude", "hermes", "pi", "sol-pi", "dsh", "omp") and r in _PROVIDER_CLAUDE_IDS:
+    if backend in ("claude", "hermes", "pi", "pi-lab", "dsh", "omp") and r in _PROVIDER_CLAUDE_IDS:
         return True   # power users may pass a provider-native claude id (claude-opus-4-8 / us.anthropic...)
-    if backend in ("codex", "hermes", "pi", "sol-pi", "dsh", "omp") and r.startswith("gpt-"):
+    if backend in ("codex", "hermes", "pi", "pi-lab", "dsh", "omp") and r.startswith("gpt-"):
         return True   # gpt-* family; Azure deployment names vary
     if backend == "dsh" and r.startswith(("deepseek", "deepseek/")):
         return True   # deepseek family; aggregator slugs vary (deepseek/deepseek-v4-pro)
@@ -7228,7 +7228,7 @@ async def _resp_execute(translator: _RespTranslator, *, org: str, member: str, s
                                  if backend == "gemini" and model_req else None),
                 "prompt": runner_prompt, "max_turns": max_step,
                 "timeout_seconds": timeout_s,
-                "sol_pi": _sol_pi_config(json.loads((hv or {}).get("sol_pi") or "null")) if backend == "sol-pi" else None,
+                "pi_lab": _pi_lab_config(json.loads((hv or {}).get("pi_lab") or "null")) if backend == "pi-lab" else None,
                 "auth": sandbox_auth, "resume_session_id": resume, "files": files_in,
                 "mcp_servers": mcp_servers, "skills": skills, "plugins": plugin_pkgs, "agent_doc": agent_doc,
                 "skills_suppressed": skills_suppressed, "tools_disabled": turn_tools_off,
@@ -7350,8 +7350,8 @@ async def _resp_execute(translator: _RespTranslator, *, org: str, member: str, s
             if new and n_total > fed_upto:
                 skip = fed_upto - cursor if fed_upto > cursor else 0
                 for cev in new[skip:]:
-                    if backend == "sol-pi" and cev.get("type") == "result" and cev.get("sol_pi"):
-                        rec["sol_pi"] = {"config": body["sol_pi"], **cev["sol_pi"]}
+                    if backend == "pi-lab" and cev.get("type") == "result" and cev.get("pi_lab"):
+                        rec["pi_lab"] = {"config": body["pi_lab"], **cev["pi_lab"]}
                     for oev in translator.feed(cev):
                         await emit(oev)
                 fed_upto = n_total
@@ -7885,7 +7885,7 @@ async def create_response(body: CreateResponseBody, request: Request):
     # explicitly selected — that's not a valid provider id. Treat it as "unset" and inherit, in order:
     #   previous round's model -> the harness default_model -> connection default (in _map_model).
     # This keeps a conversation on the user's chosen model and never ships the bare backend to Bedrock.
-    _BARE = {"claude", "codex", "anthropic", "bedrock", "openai", "hermes", "pi", "sol-pi", "dsh", "deepseek", "omp", ""}
+    _BARE = {"claude", "codex", "anthropic", "bedrock", "openai", "hermes", "pi", "pi-lab", "dsh", "deepseek", "omp", ""}
     if model_req.lower() in _BARE:
         inherited = ""
         if body.previous_response_id:
@@ -14567,9 +14567,10 @@ _BASE_CATALOG: dict[str, dict] = {
                   ("edit", "Edit")],
         "tool_enforcement": "hard",
     },
-    "sol-pi": {
-        "label": "SoL-Pi", "backend": "sol-pi", "status": "ready",
-        "system_prompt": ("You are SoL-Pi, an autonomous coding agent with configurable NVIDIA efficiency mechanisms. You operate on a real "
+    "pi-lab": {
+        "label": "Pi Lab", "backend": "pi-lab", "status": "ready",
+        "system_prompt": ("You are Pi Lab, a Pi-based autonomous coding agent whose efficiency mechanisms are switched per harness. "
+                          "You operate on a real "
                           "git workspace, reading, writing and editing files and running bash "
                           "to complete the task end to end."),
         # Pi's four built-in tools, by their real names — -xt enforces these hard, so a disabled
@@ -14839,19 +14840,19 @@ def _either(snake: str):
     return Field(default=None, validation_alias=AliasChoices(snake, camel))
 
 
-_SOL_PI_FEATURES = ("actionFusion", "observationPack", "evidencePreservingReducer", "onlineContextCompact")
+_PI_LAB_FEATURES = ("actionFusion", "observationPack", "evidencePreservingReducer", "onlineContextCompact")
 
 
-def _sol_pi_config(value=None):
+def _pi_lab_config(value=None):
     value = {} if value is None else value
     if not isinstance(value, dict):
-        raise HTTPException(400, "sol_pi must be an object")
-    allowed = {*_SOL_PI_FEATURES, "cacheWriteReadRatio", "reducerModel"}
+        raise HTTPException(400, "pi_lab must be an object")
+    allowed = {*_PI_LAB_FEATURES, "cacheWriteReadRatio", "reducerModel"}
     if set(value) - allowed:
-        raise HTTPException(400, "Unknown sol_pi fields: " + ", ".join(sorted(set(value) - allowed)))
-    config = {key: value.get(key, True) for key in _SOL_PI_FEATURES}
+        raise HTTPException(400, "Unknown pi_lab fields: " + ", ".join(sorted(set(value) - allowed)))
+    config = {key: value.get(key, True) for key in _PI_LAB_FEATURES}
     if any(type(v) is not bool for v in config.values()):
-        raise HTTPException(400, "SoL-Pi feature switches must be boolean")
+        raise HTTPException(400, "Pi Lab mechanism switches must be boolean")
     ratio = value.get("cacheWriteReadRatio", 12.5)
     if type(ratio) not in (float, int) or not math.isfinite(ratio) or ratio < 0:
         raise HTTPException(400, "cacheWriteReadRatio must be finite and non-negative")
@@ -14886,7 +14887,7 @@ class HarnessBody(BaseModel):
     # and HR_CALIBRATION_TOKEN, a credential scoped to that harness and expiring with the turn
     # (docs/dual-loop.md in the System One Harness repository, Appendix B).
     calibrates: str | None = _either("calibrates")
-    sol_pi: dict | None = _either("sol_pi")
+    pi_lab: dict | None = _either("pi_lab")
 
 
 def _harness_out(v: dict) -> dict:
@@ -14918,7 +14919,7 @@ def _harness_out(v: dict) -> dict:
             "env": _parse_env(v.get("env")),
             "maxStep": int(v.get("max_step")) if str(v.get("max_step") or "").isdigit() else None,
             "timeoutSeconds": int(v.get("timeout_seconds")) if str(v.get("timeout_seconds") or "").isdigit() else None,
-            "solPi": _sol_pi_config(json.loads(v.get("sol_pi") or "null")) if v.get("base") == "sol-pi" else None,
+            "piLab": _pi_lab_config(json.loads(v.get("pi_lab") or "null")) if v.get("base") == "pi-lab" else None,
             "calibrates": str(v.get("calibrates") or ""),
             "member": v.get("member") or "", "workspace": v.get("workspace") or "", "createdAt": created}
 
@@ -14929,10 +14930,10 @@ async def _vg_list_by_org(label: str, org: str) -> list[dict]:
 
 def _harness_props(body: HarnessBody) -> dict:
     base = _require_supported_base(body.base)   # refuse at create, not at the first task
-    if body.sol_pi is not None and base != "sol-pi":
-        raise HTTPException(400, "sol_pi configuration requires the sol-pi base")
-    sol_pi = _sol_pi_config(body.sol_pi) if base == "sol-pi" else None
-    return {"sol_pi": json.dumps(sol_pi), "name": body.name, "base": base, "base_label": body.base_label or base,
+    if body.pi_lab is not None and base != "pi-lab":
+        raise HTTPException(400, "pi_lab configuration requires the pi-lab base")
+    pi_lab = _pi_lab_config(body.pi_lab) if base == "pi-lab" else None
+    return {"pi_lab": json.dumps(pi_lab), "name": body.name, "base": base, "base_label": body.base_label or base,
             "default_model": body.default_model or "", "system_prompt": body.system_prompt or "",
             "mcp_servers": json.dumps(body.mcp_servers or []), "skills": json.dumps(body.skills or []),
             "plugins": json.dumps(body.plugins or []),
@@ -16318,7 +16319,7 @@ async def _cloud_harness_body(org: str, hid: str, v: dict, plugins_ok: bool = Fa
             "default_model": out.get("defaultModel") or None, "system_prompt": out.get("systemPrompt") or None,
             "mcp_servers": (out.get("mcpServers") or []) + mcp_extra, "skills": skills + skills_extra,
             **({"plugins": plugins} if plugins_ok else {}),
-            "sol_pi": out.get("solPi"),
+            "pi_lab": out.get("piLab"),
             "disabled_tools": out.get("disabledTools") or [], "max_step": out.get("maxStep"),
             "timeout_seconds": out.get("timeoutSeconds"), "additional_headers": out.get("additionalHeaders") or [],
             "kit": out.get("kit") or None,

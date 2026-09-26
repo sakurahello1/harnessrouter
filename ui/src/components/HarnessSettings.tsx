@@ -238,7 +238,7 @@ export function HarnessSettings({ id, embedded = false, onNavigate }: {
 
   const name = oob ? oob.name : draft!.name;
   const readOnly = Boolean(oob);
-  const solPi = draft?.solPi ?? {};
+  const piLab = draft?.piLab ?? {};
   const skills = draft?.skills || [];
   const ownSkills = skills.map((s, idx) => ({ s, idx })).filter(({ s }) => isOwnSkill(s));
   // Built-ins the harness has not replaced with one of its own. A built-in is implicit: the
@@ -323,7 +323,7 @@ export function HarnessSettings({ id, embedded = false, onNavigate }: {
           <section className="form-section">
             <div><h3>Agent instructions</h3><p>Persistent role, conventions, constraints, and output contract loaded on every Task.</p></div>
             <div className="field-stack">
-              <div className="field"><label htmlFor="hsInstructions">{(base?.id || draft?.base || '') === 'systemone' ? 'Instructions' : ['codex', 'hermes', 'omp', 'pi', 'sol-pi', 'opencode', 'dsh', 'qwen', 'cline', 'goose', 'kimi', 'aider', 'openhands'].includes(base?.id || draft?.base || '') ? 'AGENTS.md' : 'CLAUDE.md'}</label>
+              <div className="field"><label htmlFor="hsInstructions">{(base?.id || draft?.base || '') === 'systemone' ? 'Instructions' : ['codex', 'hermes', 'omp', 'pi', 'pi-lab', 'opencode', 'dsh', 'qwen', 'cline', 'goose', 'kimi', 'aider', 'openhands'].includes(base?.id || draft?.base || '') ? 'AGENTS.md' : 'CLAUDE.md'}</label>
                 <textarea id="hsInstructions" rows={7} disabled={readOnly}
                   value={oob ? oob.systemPrompt : (draft?.systemPrompt || '')}
                   onChange={(e) => upd({ systemPrompt: e.target.value })} />
@@ -539,9 +539,9 @@ export function HarnessSettings({ id, embedded = false, onNavigate }: {
             </div>
           </section>
 
-          {(base?.id || draft?.base) === 'sol-pi' && (
+          {(base?.id || draft?.base) === 'pi-lab' && (
             <section className="form-section">
-              <div><h3>SoL-Pi mechanisms</h3><p>{readOnly ? 'Built-in defaults. Use Fork and Customize below to change mechanisms.' : 'Configure this agent independently of Pi. Changes apply to the next Task turn.'}</p></div>
+              <div><h3>Mechanisms</h3><p>{readOnly ? 'Built-in defaults. Use Fork and Customize below to change mechanisms.' : 'The four from NVIDIA SoL-Pi, each switched on its own. Plain Pi is unaffected. Changes apply to the next Task turn.'}</p></div>
               <div className="field-stack">
                 {([
                   ['actionFusion', 'Action Fusion', 'Combine an edit or write with its follow-up shell command.'],
@@ -551,24 +551,24 @@ export function HarnessSettings({ id, embedded = false, onNavigate }: {
                 ] as const).map(([key, label, description]) => (
                   <div className="capability-row" key={key}>
                     <span className="capability-icon" aria-hidden="true"><iconify-icon icon="tabler:adjustments"></iconify-icon></span>
-                    <div className="capability-copy"><strong id={`sol-${key}`}>{label}</strong><span>{description}</span></div>
+                    <div className="capability-copy"><strong id={`lab-${key}`}>{label}</strong><span>{description}</span></div>
                     <div className="capability-actions"><button className="toggle-button" type="button" disabled={readOnly}
-                      aria-labelledby={`sol-${key}`} aria-pressed={solPi[key] ?? true}
-                      onClick={() => upd({ solPi: { ...solPi, [key]: !(solPi[key] ?? true) } })}>
-                      {(solPi[key] ?? true) ? 'Enabled' : 'Disabled'}
+                      aria-labelledby={`lab-${key}`} aria-pressed={piLab[key] ?? true}
+                      onClick={() => upd({ piLab: { ...piLab, [key]: !(piLab[key] ?? true) } })}>
+                      {(piLab[key] ?? true) ? 'Enabled' : 'Disabled'}
                     </button></div>
                   </div>
                 ))}
                 <div className="two-column-fields">
-                  <div className="field"><label htmlFor="solRatio">Cache write/read price ratio</label>
-                    <input id="solRatio" type="number" min={0} step="any" disabled={readOnly}
-                      value={solPi.cacheWriteReadRatio ?? 12.5}
-                      onChange={(e) => upd({ solPi: { ...solPi, cacheWriteReadRatio: e.target.value === '' ? undefined : Number(e.target.value) } })} />
+                  <div className="field"><label htmlFor="labRatio">Cache write/read price ratio</label>
+                    <input id="labRatio" type="number" min={0} step="any" disabled={readOnly}
+                      value={piLab.cacheWriteReadRatio ?? 12.5}
+                      onChange={(e) => upd({ piLab: { ...piLab, cacheWriteReadRatio: e.target.value === '' ? undefined : Number(e.target.value) } })} />
                     <span className="field-help">Used by the compaction cost gate. Set this for the model and provider you run.</span></div>
-                  <div className="field"><label htmlFor="solReducer">Reducer model (optional)</label>
-                    <input id="solReducer" disabled={readOnly} value={solPi.reducerModel ?? ''}
+                  <div className="field"><label htmlFor="labReducer">Reducer model (optional)</label>
+                    <input id="labReducer" disabled={readOnly} value={piLab.reducerModel ?? ''}
                       placeholder="Use the Task model"
-                      onChange={(e) => upd({ solPi: { ...solPi, reducerModel: e.target.value.trim() || undefined } })} />
+                      onChange={(e) => upd({ piLab: { ...piLab, reducerModel: e.target.value.trim() || undefined } })} />
                     <span className="field-help">Uses the same provider connection and API format. Empty uses the Task model. Reducer usage is recorded separately and is not included in the current cost widgets.</span></div>
                 </div>
               </div>
